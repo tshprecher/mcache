@@ -74,7 +74,7 @@ func (t *TextProtocolSession) Serve() {
 }
 
 func (t *TextProtocolSession) serveSet(cmd *StorageCommand) error {
-	ok := t.engine.Set(cmd.Key, cmd.DataBlock)
+	ok := t.engine.Set(cmd.Key, store.Value{cmd.Flags, cmd.DataBlock})
 	if ok {
 		return t.messageBuffer.Write(TextStoredResponse{})
 	} else {
