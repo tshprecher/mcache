@@ -130,6 +130,10 @@ func TestTextReadSetCommand(t *testing.T) {
 	testTextRead(t, buf, wireIn, packets, expResults)
 }
 
+func TestTextReadMultiple(t *testing.T) {
+	t.Errorf("implement me")
+}
+
 func TestTextWrite(t *testing.T) {
 	wireIn, wireOut := &bytes.Buffer{}, &bytes.Buffer{}
 	buf := NewTextProtocolMessageBuffer(wireIn, wireOut)

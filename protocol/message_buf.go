@@ -5,6 +5,7 @@ import (
 	"errors"
 	"github.com/golang/go/src/pkg/strconv"
 	"io"
+	"log"
 	"strings"
 )
 
@@ -84,6 +85,8 @@ func (t *textProtocolMessageBuffer) Read() (cmd *Command, err error) {
 		t.curCmd.storageCommand = nil
 		t.curCmd.retrievalCommand = nil
 		t.cmdComplete = false
+		t.cmdType = -1
+		log.Printf("received %v command", strings.Split(string(t.cmdHeader.Bytes()), " ")[0])
 	}
 	return
 }
@@ -96,6 +99,7 @@ func (t *textProtocolMessageBuffer) readHeader() error {
 		return err
 	}
 	for n > 0 {
+		//		log.Printf("DEBUG A: read header byte %v\n", b[0])
 		t.cmdHeader.Write(b[0:1])
 		// TODO: this is slow. fix later once end-to-end solution works
 		bytes := t.cmdHeader.Bytes()
@@ -192,6 +196,7 @@ func (t *textProtocolMessageBuffer) readDataBlock() error {
 		return err
 	}
 	for len(t.curCmd.storageCommand.DataBlock) < int(t.curCmd.storageCommand.NumBytes)+2 {
+		//		log.Printf("DEBUG B: read body byte %v\n", b[0])
 		if n > 0 {
 			t.curCmd.storageCommand.DataBlock = append(t.curCmd.storageCommand.DataBlock, b[0:1]...)
 			n, err = t.wireIn.Read(b[0:1])
