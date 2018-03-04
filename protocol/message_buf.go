@@ -8,6 +8,8 @@ import (
 	"strings"
 )
 
+var _ MessageBuffer = &textProtocolMessageBuffer{}
+
 var cmdStringToType = map[string]int{
 	"set":     SetCommand,
 	"add":     AddCommand,
@@ -21,7 +23,7 @@ var cmdStringToType = map[string]int{
 
 type MessageBuffer interface {
 	Read() (*Command, error)
-	Write(r Response)
+	Write(r Response) error
 }
 
 type textProtocolMessageBuffer struct {
@@ -45,6 +47,19 @@ func NewTextProtocolMessageBuffer(wireIn io.Reader, wireOut io.Writer) *textProt
 		cmdType:     -1,
 		cmdComplete: false,
 	}
+}
+
+func (t *textProtocolMessageBuffer) Write(r Response) (err error) {
+	// TODO: handle the case where writing does *not* complete all bytes on the first attempt
+	// perhaps spin until an error is reached and there's some sort of timeout and the close the connection?
+	bytes := r.Bytes()
+	n, err := t.wireOut.Write(bytes)
+	if err != nil {
+		return
+	} else if n < len(bytes) {
+		err = errors.New("could not write complete message to wire")
+	}
+	return
 }
 
 func (t *textProtocolMessageBuffer) Read() (cmd *Command, err error) {
@@ -198,9 +213,4 @@ func (t *textProtocolMessageBuffer) readBody() error {
 	} else {
 		panic("implement for retrieval")
 	}
-}
-
-func (t *textProtocolMessageBuffer) Write(r Response) {
-	// TODO: implement
-	return
 }

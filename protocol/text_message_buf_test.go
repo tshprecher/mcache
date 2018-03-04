@@ -72,7 +72,7 @@ func testTextRead(t *testing.T, buf MessageBuffer, wireIn *bytes.Buffer, packets
 	}
 }
 
-func TestTextHandleSplitPackets(t *testing.T) {
+func TestTextReadSplitPackets(t *testing.T) {
 	packets := [][]byte{
 		[]byte("set my_key"),
 		[]byte(" 3 2 1"),
@@ -105,7 +105,7 @@ func TestTextHandleSplitPackets(t *testing.T) {
 	testTextRead(t, buf, wireIn, packets, expResults)
 }
 
-func TestTextSetCommand(t *testing.T) {
+func TestTextReadSetCommand(t *testing.T) {
 	packets := [][]byte{
 		[]byte("set my_key 3 2 1\r\n1\r\n"),
 	}
@@ -128,4 +128,28 @@ func TestTextSetCommand(t *testing.T) {
 	wireIn, wireOut := &bytes.Buffer{}, &bytes.Buffer{}
 	buf := NewTextProtocolMessageBuffer(wireIn, wireOut)
 	testTextRead(t, buf, wireIn, packets, expResults)
+}
+
+func TestTextWrite(t *testing.T) {
+	wireIn, wireOut := &bytes.Buffer{}, &bytes.Buffer{}
+	buf := NewTextProtocolMessageBuffer(wireIn, wireOut)
+
+	resp := TextStoredResponse{}
+	buf.Write(resp)
+	if wireOut.Len() != len(resp.Bytes()) {
+		t.Errorf("expected %v bytes written, received %v", len(resp.Bytes()), wireOut.Len())
+	}
+
+	resp2 := TextExistsResponse{}
+	buf.Write(resp2)
+	if wireOut.Len() != len(resp.Bytes())+len(resp2.Bytes()) {
+		t.Errorf("expected %v bytes written, received %v", len(resp.Bytes())+len(resp2.Bytes()), wireOut.Len())
+	}
+
+	bytes := make([]byte, wireOut.Len())
+	wireOut.Read(bytes)
+
+	if string(bytes) != "STORED\r\nEXISTS\r\n" {
+		t.Errorf("expected bytes written value %v, received %v", []byte("STORED\r\nEXISTS\r\n"), bytes)
+	}
 }
