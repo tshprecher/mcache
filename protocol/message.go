@@ -19,6 +19,9 @@ const (
 	// the two retrieval commands
 	GetCommand
 	GetsCommand
+
+	// delete command
+	DelCommand
 )
 
 var (
@@ -32,6 +35,10 @@ func IsStorageCommand(typ int) bool {
 
 func IsRetrievalCommand(typ int) bool {
 	return typ == GetCommand || typ == GetsCommand
+}
+
+func IsDeleteCommand(typ int) bool {
+	return typ == DelCommand
 }
 
 /////
@@ -55,9 +62,15 @@ type RetrievalCommand struct {
 	keys []string
 }
 
+type DeleteCommand struct {
+	Key     string
+	NoReply bool
+}
+
 type Command struct {
 	storageCommand   *StorageCommand
 	retrievalCommand *RetrievalCommand
+	deleteCommand    *DeleteCommand
 }
 
 ////
@@ -84,6 +97,12 @@ type TextExistsResponse struct{}
 
 func (_ TextExistsResponse) Bytes() []byte {
 	return []byte("EXISTS\r\n")
+}
+
+type TextDeletedResponse struct{}
+
+func (_ TextDeletedResponse) Bytes() []byte {
+	return []byte("DELETED\r\n")
 }
 
 type TextNotFoundResponse struct{}

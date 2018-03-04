@@ -7,6 +7,7 @@ import (
 	"net"
 )
 
+// TODO: honor noreply
 type TextProtocolSession struct {
 	conn          net.Conn
 	messageBuffer MessageBuffer
@@ -63,8 +64,12 @@ func (t *TextProtocolSession) Serve() {
 			case CasCommand:
 				err = errors.New("cas not yet implemented")
 			}
-		} else {
+		} else if cmd.retrievalCommand != nil {
 			err = errors.New("retrieval commands not yet implemented")
+		} else if cmd.deleteCommand != nil {
+			err = t.serveDelete(cmd.deleteCommand)
+		} else {
+			panic("no command set")
 		}
 	}
 	if err != nil {
@@ -78,6 +83,16 @@ func (t *TextProtocolSession) serveSet(cmd *StorageCommand) error {
 	if ok {
 		return t.messageBuffer.Write(TextStoredResponse{})
 	} else {
+		// TODO: this should never fail. if it does write a server error
 		return t.messageBuffer.Write(TextNotStoredResponse{})
+	}
+}
+
+func (t *TextProtocolSession) serveDelete(cmd *DeleteCommand) error {
+	ok := t.engine.Delete(cmd.Key)
+	if ok {
+		return t.messageBuffer.Write(TextDeletedResponse{})
+	} else {
+		return t.messageBuffer.Write(TextNotFoundResponse{})
 	}
 }

@@ -20,6 +20,7 @@ var cmdStringToType = map[string]int{
 	"cas":     CasCommand,
 	"get":     GetCommand,
 	"gets":    GetsCommand,
+	"delete":  DelCommand,
 }
 
 type MessageBuffer interface {
@@ -80,13 +81,15 @@ func (t *textProtocolMessageBuffer) Read() (cmd *Command, err error) {
 	}
 
 	if t.cmdComplete {
+		glog.Infof("received command: '%v'", string(t.cmdHeader.Bytes()))
 		cmd = new(Command)
 		*cmd = t.curCmd
 		t.curCmd.storageCommand = nil
 		t.curCmd.retrievalCommand = nil
+		t.curCmd.deleteCommand = nil
 		t.cmdComplete = false
 		t.cmdType = -1
-		glog.Infof("received command: '%v'", string(t.cmdHeader.Bytes()))
+		t.cmdHeader.Truncate(0)
 	}
 	return
 }
@@ -127,10 +130,44 @@ func (t *textProtocolMessageBuffer) parseHeader(bytes []byte) (err error) {
 	}
 	if IsStorageCommand(typ) {
 		err = t.unpackStorageCommand(typ, terms)
-	} else {
+	} else if IsRetrievalCommand(typ) {
 		err = t.unpackRetrievalCommand(typ, terms)
+	} else if IsDeleteCommand(typ) {
+		err = t.unpackDeleteCommand(typ, terms)
 	}
 	return
+}
+
+func (t *textProtocolMessageBuffer) validateKey(key string) error {
+	if len(key) > MaxKeyLength || !keyRegex.MatchString(key) {
+		return errors.New("invalid command: malformed key")
+	}
+	return nil
+}
+
+func (t *textProtocolMessageBuffer) unpackDeleteCommand(typ int, terms []string) error {
+	if len(terms) < 2 || len(terms) > 3 {
+		return errors.New("invalid command: delete must take exactly 2 or 3 terms")
+	}
+	key := terms[1]
+	err := t.validateKey(key)
+	if err != nil {
+		return err
+	}
+	noReply := false
+	if len(terms) == 3 {
+		if terms[2] == "noreply" {
+			noReply = true
+		} else {
+			return errors.New("invalid command: expected 'noreply' as last term")
+		}
+	}
+	t.cmdType = typ
+	t.curCmd.deleteCommand = &DeleteCommand{
+		Key:     key,
+		NoReply: noReply,
+	}
+	return nil
 }
 
 func (t *textProtocolMessageBuffer) unpackStorageCommand(typ int, terms []string) error {
@@ -138,8 +175,9 @@ func (t *textProtocolMessageBuffer) unpackStorageCommand(typ int, terms []string
 		return errors.New("invalid command: storage commands must take exactly 5 or 6 terms")
 	}
 	key := terms[1]
-	if len(key) > MaxKeyLength || !keyRegex.MatchString(key) {
-		return errors.New("invalid command: malformed key")
+	err := t.validateKey(key)
+	if err != nil {
+		return err
 	}
 	flags, err := strconv.ParseUint(terms[2], 10, 16)
 	if err != nil {
@@ -165,7 +203,7 @@ func (t *textProtocolMessageBuffer) unpackStorageCommand(typ int, terms []string
 		if terms[len(terms)-1] == "noreply" {
 			noReply = true
 		} else {
-			errors.New("invalid command: expected 'noreply' as last term")
+			return errors.New("invalid command: expected 'noreply' as last term")
 		}
 	}
 
@@ -216,7 +254,11 @@ func (t *textProtocolMessageBuffer) readDataBlock() error {
 func (t *textProtocolMessageBuffer) readBody() error {
 	if IsStorageCommand(t.cmdType) {
 		return t.readDataBlock()
-	} else {
-		panic("implement for retrieval")
+	} else if IsRetrievalCommand(t.cmdType) {
+		panic("implement retrieval")
+	} else if IsDeleteCommand(t.cmdType) {
+		// no body, so just set completion
+		t.cmdComplete = true
 	}
+	return nil
 }

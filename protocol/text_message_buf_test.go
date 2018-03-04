@@ -17,7 +17,7 @@ func expectEquals(t *testing.T, expected, actual interface{}) {
 	}
 }
 
-func expectMaxOneSubcommand(t *testing.T, received *Command) {
+func expectOneSubcommand(t *testing.T, received *Command) {
 	if received == nil {
 		return
 	}
@@ -28,8 +28,11 @@ func expectMaxOneSubcommand(t *testing.T, received *Command) {
 	if received.retrievalCommand != nil {
 		count++
 	}
+	if received.deleteCommand != nil {
+		count++
+	}
 	if count != 1 {
-		t.Errorf("expected at most one non-nil subcommand")
+		t.Errorf("expected one non-nil subcommand")
 	}
 }
 
@@ -50,6 +53,8 @@ func expectCommandEquals(t *testing.T, expected, actual *Command) {
 		expectEquals(t, *expected.storageCommand, *actual.storageCommand)
 	} else if expected.retrievalCommand != nil {
 		panic("TODO: implement retrieval equals")
+	} else if expected.deleteCommand != nil {
+		expectEquals(t, *expected.deleteCommand, *actual.deleteCommand)
 	}
 }
 
@@ -67,7 +72,7 @@ func testTextRead(t *testing.T, buf MessageBuffer, wireIn *bytes.Buffer, packets
 		wireIn.Write(packets[p])
 		res = readResult{}
 		res.cmd, res.err = buf.Read()
-		expectMaxOneSubcommand(t, res.cmd)
+		expectOneSubcommand(t, res.cmd)
 		expectReadResultEquals(t, expectedResults[p], res)
 	}
 }
@@ -81,10 +86,10 @@ func TestTextReadSplitPackets(t *testing.T) {
 		[]byte("1\r\n"),
 	}
 	expResults := []readResult{
-		readResult{nil, nil},
-		readResult{nil, nil},
-		readResult{nil, nil},
-		readResult{nil, nil},
+		readResult{},
+		readResult{},
+		readResult{},
+		readResult{},
 		readResult{
 			cmd: &Command{
 				storageCommand: &StorageCommand{
@@ -131,7 +136,65 @@ func TestTextReadSetCommand(t *testing.T) {
 }
 
 func TestTextReadMultiple(t *testing.T) {
-	t.Errorf("implement me")
+	packets := [][]byte{
+		[]byte("set my_key 3 2 1\r\n1\r\n"),
+		[]byte("set my_key2 3 2 1\r"),
+		[]byte("\n2\r\n"),
+	}
+	expResults := []readResult{
+		readResult{
+			cmd: &Command{
+				storageCommand: &StorageCommand{
+					Typ:       SetCommand,
+					Key:       "my_key",
+					Flags:     3,
+					ExpTime:   2,
+					NumBytes:  1,
+					NoReply:   false,
+					DataBlock: []byte("1"),
+				},
+			},
+			err: nil,
+		},
+		readResult{},
+		readResult{
+			cmd: &Command{
+				storageCommand: &StorageCommand{
+					Typ:       SetCommand,
+					Key:       "my_key2",
+					Flags:     3,
+					ExpTime:   2,
+					NumBytes:  1,
+					NoReply:   false,
+					DataBlock: []byte("2"),
+				},
+			},
+			err: nil,
+		},
+	}
+	wireIn, wireOut := &bytes.Buffer{}, &bytes.Buffer{}
+	buf := NewTextProtocolMessageBuffer(wireIn, wireOut)
+	testTextRead(t, buf, wireIn, packets, expResults)
+}
+
+func TestTextReadDeleteCommand(t *testing.T) {
+	packets := [][]byte{
+		[]byte("delete my_key\r\n"),
+	}
+	expResults := []readResult{
+		readResult{
+			cmd: &Command{
+				deleteCommand: &DeleteCommand{
+					Key:     "my_key",
+					NoReply: false,
+				},
+			},
+			err: nil,
+		},
+	}
+	wireIn, wireOut := &bytes.Buffer{}, &bytes.Buffer{}
+	buf := NewTextProtocolMessageBuffer(wireIn, wireOut)
+	testTextRead(t, buf, wireIn, packets, expResults)
 }
 
 func TestTextWrite(t *testing.T) {
