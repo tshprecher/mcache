@@ -1,10 +1,11 @@
 package main
 
 import (
+	"flag"
 	"fmt"
+	"github.com/golang/glog"
 	"github.com/tshprecher/mcache/protocol"
 	"github.com/tshprecher/mcache/store"
-	"log"
 	"net"
 )
 
@@ -13,7 +14,7 @@ var storageEngine store.StorageEngine
 func listen() {
 	ln, err := net.Listen("tcp", ":11211")
 	if err != nil {
-		log.Fatalf("error when starting server: %v\n", err.Error())
+		glog.Fatalf("error when starting server: %v\n", err.Error())
 	}
 	for {
 		conn, err := ln.Accept()
@@ -26,14 +27,16 @@ func listen() {
 
 func handleConn(conn net.Conn) {
 	session := protocol.NewTextProtocolSession(conn, storageEngine)
-	log.Print("session created")
+	glog.Infof("session started: addr=%v", conn.RemoteAddr())
 	for session.Alive() {
 		session.Serve()
 	}
-	log.Print("session completed")
+	glog.Infof("session ended: addr=%v", conn.RemoteAddr())
+
 }
 
 func main() {
+	flag.Parse()
 	fmt.Println("starting storage engine...")
 	storageEngine = store.NewSimpleStorageEngine()
 	fmt.Println("starting server...")

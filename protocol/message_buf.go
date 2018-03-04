@@ -3,9 +3,9 @@ package protocol
 import (
 	"bytes"
 	"errors"
-	"github.com/golang/go/src/pkg/strconv"
+	"github.com/golang/glog"
 	"io"
-	"log"
+	"strconv"
 	"strings"
 )
 
@@ -86,7 +86,7 @@ func (t *textProtocolMessageBuffer) Read() (cmd *Command, err error) {
 		t.curCmd.retrievalCommand = nil
 		t.cmdComplete = false
 		t.cmdType = -1
-		log.Printf("received %v command", strings.Split(string(t.cmdHeader.Bytes()), " ")[0])
+		glog.Infof("received command: '%v'", string(t.cmdHeader.Bytes()))
 	}
 	return
 }
@@ -105,7 +105,8 @@ func (t *textProtocolMessageBuffer) readHeader() error {
 		bytes := t.cmdHeader.Bytes()
 		if len(bytes) >= 2 && bytes[len(bytes)-1] == '\n' && bytes[len(bytes)-2] == '\r' {
 			// reached the end of the cmd header so parse it.
-			return t.parseHeader(bytes[0 : len(bytes)-2])
+			t.cmdHeader.Truncate(t.cmdHeader.Len() - 2)
+			return t.parseHeader(t.cmdHeader.Bytes())
 		}
 		n, err = t.wireIn.Read(b[0:1])
 	}

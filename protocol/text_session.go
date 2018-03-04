@@ -2,6 +2,7 @@ package protocol
 
 import (
 	"errors"
+	"github.com/golang/glog"
 	"github.com/tshprecher/mcache/store"
 	"net"
 )
@@ -26,8 +27,8 @@ func (t *TextProtocolSession) Alive() bool {
 	return t.alive
 }
 
-func (t *TextProtocolSession) closeOnError(_ error) {
-	// TODO: import glog and log this error
+func (t *TextProtocolSession) closeOnError(err error) {
+	// TODO: import glog and log this error=
 	t.conn.Close()
 	t.alive = false
 }
@@ -41,6 +42,7 @@ func (t *TextProtocolSession) Serve() {
 		// write an error and close the connection
 		// TODO: distinguish between recoverable and non recoverable errors?
 		// TODO: add logging where appropriate
+		glog.Errorf("command error: %s", err.Error())
 		t.closeOnError(err)
 		return
 	}
@@ -76,6 +78,6 @@ func (t *TextProtocolSession) serveSet(cmd *StorageCommand) error {
 	if ok {
 		return t.messageBuffer.Write(TextStoredResponse{})
 	} else {
-		return t.messageBuffer.Write(TextStoredResponse{})
+		return t.messageBuffer.Write(TextNotStoredResponse{})
 	}
 }
