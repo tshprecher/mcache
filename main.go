@@ -29,7 +29,11 @@ func handleConn(conn net.Conn) {
 	session := protocol.NewTextProtocolSession(conn, storageEngine)
 	glog.Infof("session started: addr=%v", conn.RemoteAddr())
 	for session.Alive() {
-		session.Serve()
+		err := session.Serve()
+		if err != nil {
+			glog.Errorf("error serving: %v", err)
+		}
+		session.Close()
 	}
 	glog.Infof("session ended: addr=%v", conn.RemoteAddr())
 

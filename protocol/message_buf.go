@@ -117,7 +117,7 @@ func (t *textProtocolMessageBuffer) readHeader() error {
 }
 
 func (t *textProtocolMessageBuffer) parseHeader(bytes []byte) (err error) {
-	terms := strings.Split(string(bytes), " ")
+	terms := strings.Split(strings.TrimSpace(string(bytes)), " ")
 	if len(terms) == 0 {
 		// TODO: consolidate errors up top
 		err = errors.New("invalid command: empty command line")
@@ -166,6 +166,22 @@ func (t *textProtocolMessageBuffer) unpackDeleteCommand(typ int, terms []string)
 	t.curCmd.deleteCommand = &DeleteCommand{
 		Key:     key,
 		NoReply: noReply,
+	}
+	return nil
+}
+
+func (t *textProtocolMessageBuffer) unpackRetrievalCommand(typ int, terms []string) error {
+	keys := terms[1:]
+	for _, k := range keys {
+		err := t.validateKey(k)
+		if err != nil {
+			return err
+		}
+	}
+	t.cmdType = typ
+	t.curCmd.retrievalCommand = &RetrievalCommand{
+		Typ:  typ,
+		keys: keys,
 	}
 	return nil
 }
@@ -223,11 +239,6 @@ func (t *textProtocolMessageBuffer) unpackStorageCommand(typ int, terms []string
 	return nil
 }
 
-func (t *textProtocolMessageBuffer) unpackRetrievalCommand(typ int, terms []string) (err error) {
-	// TODO: implement
-	return
-}
-
 func (t *textProtocolMessageBuffer) readDataBlock() error {
 	b := [1]byte{}
 	n, err := t.wireIn.Read(b[0:1])
@@ -255,7 +266,8 @@ func (t *textProtocolMessageBuffer) readBody() error {
 	if IsStorageCommand(t.cmdType) {
 		return t.readDataBlock()
 	} else if IsRetrievalCommand(t.cmdType) {
-		panic("implement retrieval")
+		// no body, so just set completion
+		t.cmdComplete = true
 	} else if IsDeleteCommand(t.cmdType) {
 		// no body, so just set completion
 		t.cmdComplete = true

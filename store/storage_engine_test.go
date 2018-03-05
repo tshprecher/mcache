@@ -11,7 +11,7 @@ func expectBoolEquals(t *testing.T, exp, rec bool) {
 }
 
 func expectValueEquals(t *testing.T, exp, rec Value) {
-	if exp.Flags != rec.Flags {
+	if exp.Flags != rec.Flags || exp.CasUnique != rec.CasUnique {
 		t.Errorf("expected value %v, received %v", exp, rec)
 	}
 	if exp.Bytes == nil && rec.Bytes == nil {
@@ -34,35 +34,35 @@ func testCommon(t *testing.T, s StorageEngine) {
 	expectValueEquals(t, Value{}, value)
 
 	// set key1, then read it
-	set := s.Set("key1", Value{1, []byte("value1")})
+	set := s.Set("key1", Value{1, 0, []byte("value1")})
 	expectBoolEquals(t, true, set)
 	value, found = s.Get("key1")
 	expectBoolEquals(t, true, found)
-	expectValueEquals(t, Value{1, []byte("value1")}, value)
+	expectValueEquals(t, Value{1, 0, []byte("value1")}, value)
 
 	// overwrite key1, then read it
-	set = s.Set("key1", Value{2, []byte("value2")})
+	set = s.Set("key1", Value{2, 0, []byte("value2")})
 	expectBoolEquals(t, true, set)
 	value, found = s.Get("key1")
 	expectBoolEquals(t, true, found)
-	expectValueEquals(t, Value{2, []byte("value2")}, value)
+	expectValueEquals(t, Value{2, 1, []byte("value2")}, value)
 
 	// deleting a key that does not exist returns false
 	deleted := s.Delete("key_not_existing")
 	expectBoolEquals(t, false, deleted)
 
 	// set second key, then read it
-	set = s.Set("key2", Value{0, []byte("value3")})
+	set = s.Set("key2", Value{0, 100, []byte("value3")})
 	expectBoolEquals(t, true, set)
 	value, found = s.Get("key2")
 	expectBoolEquals(t, true, found)
-	expectValueEquals(t, Value{0, []byte("value3")}, value)
+	expectValueEquals(t, Value{0, 2, []byte("value3")}, value)
 
 	// read first key to make sure it's not modified
 	value, found = s.Get("key1")
 	expectBoolEquals(t, true, found)
 	expectBoolEquals(t, true, set)
-	expectValueEquals(t, Value{2, []byte("value2")}, value)
+	expectValueEquals(t, Value{2, 1, []byte("value2")}, value)
 
 	// successfully delete both keys
 	deleted = s.Delete("key1")

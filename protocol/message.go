@@ -3,7 +3,12 @@
 // see: https://github.com/memcached/memcached/blob/master/doc/protocol.txt
 package protocol
 
-import "regexp"
+import (
+	"bytes"
+	"fmt"
+	"github.com/tshprecher/mcache/store"
+	"regexp"
+)
 
 const (
 	MaxKeyLength = 250
@@ -25,7 +30,7 @@ const (
 )
 
 var (
-	keyRegex = regexp.MustCompile("[0-9a-zA-Z_]+")
+	keyRegex = regexp.MustCompile(`^[0-9a-zA-Z_]+$`)
 )
 
 func IsStorageCommand(typ int) bool {
@@ -109,4 +114,24 @@ type TextNotFoundResponse struct{}
 
 func (_ TextNotFoundResponse) Bytes() []byte {
 	return []byte("NOT_FOUND\r\n")
+}
+
+type TextGetOrGetsResponse struct {
+	values      map[string]store.Value
+	withCasUniq bool
+}
+
+func (t TextGetOrGetsResponse) Bytes() []byte {
+	buf := &bytes.Buffer{}
+	for k, v := range t.values {
+		if t.withCasUniq {
+			buf.WriteString(fmt.Sprintf("VALUE %s %d %d %d\r\n", k, v.Flags, len(v.Bytes), v.CasUnique))
+		} else {
+			buf.WriteString(fmt.Sprintf("VALUE %s %d %d\r\n", k, v.Flags, len(v.Bytes)))
+		}
+		buf.Write(v.Bytes)
+		buf.WriteString("\r\n")
+	}
+	buf.WriteString("END\r\n")
+	return buf.Bytes()
 }

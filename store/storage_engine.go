@@ -5,8 +5,9 @@ import (
 )
 
 type Value struct {
-	Flags uint16
-	Bytes []byte
+	Flags     uint16
+	CasUnique int64
+	Bytes     []byte
 }
 
 type StorageEngine interface {
@@ -18,18 +19,21 @@ type StorageEngine interface {
 }
 
 func NewSimpleStorageEngine() StorageEngine {
-	return &SimpleStorageEngine{map[string]Value{}, sync.Mutex{}}
+	return &SimpleStorageEngine{map[string]Value{}, 0, sync.Mutex{}}
 }
 
 // TODO: add memory limits
 type SimpleStorageEngine struct {
-	values map[string]Value
-	mu     sync.Mutex
+	values       map[string]Value
+	curCasUnique int64
+	mu           sync.Mutex
 }
 
 func (s *SimpleStorageEngine) Set(key string, value Value) bool {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	value.CasUnique = s.curCasUnique
+	s.curCasUnique++
 	s.values[key] = value
 	return true
 }

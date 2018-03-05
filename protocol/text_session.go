@@ -2,7 +2,6 @@ package protocol
 
 import (
 	"errors"
-	"github.com/golang/glog"
 	"github.com/tshprecher/mcache/store"
 	"net"
 )
@@ -28,24 +27,22 @@ func (t *TextProtocolSession) Alive() bool {
 	return t.alive
 }
 
-func (t *TextProtocolSession) closeOnError(err error) {
-	// TODO: import glog and log this error=
-	t.conn.Close()
+func (t *TextProtocolSession) Close() error {
+	err := t.conn.Close()
 	t.alive = false
+	return err
 }
 
-func (t *TextProtocolSession) Serve() {
+func (t *TextProtocolSession) Serve() error {
 	if !t.alive {
-		return
+		return errors.New("cannot serve a dead session")
 	}
 	cmd, err := t.messageBuffer.Read()
 	if err != nil {
 		// write an error and close the connection
 		// TODO: distinguish between recoverable and non recoverable errors?
 		// TODO: add logging where appropriate
-		glog.Errorf("command error: %s", err.Error())
-		t.closeOnError(err)
-		return
+		return err
 	}
 
 	if cmd != nil {
@@ -65,27 +62,38 @@ func (t *TextProtocolSession) Serve() {
 				err = errors.New("cas not yet implemented")
 			}
 		} else if cmd.retrievalCommand != nil {
-			err = errors.New("retrieval commands not yet implemented")
+			switch cmd.retrievalCommand.Typ {
+			case GetCommand, GetsCommand:
+				err = t.serveGetAndGets(cmd.retrievalCommand)
+			}
 		} else if cmd.deleteCommand != nil {
 			err = t.serveDelete(cmd.deleteCommand)
 		} else {
 			panic("no command set")
 		}
 	}
-	if err != nil {
-		t.closeOnError(err)
-	}
-	return
+	return err
 }
 
 func (t *TextProtocolSession) serveSet(cmd *StorageCommand) error {
-	ok := t.engine.Set(cmd.Key, store.Value{cmd.Flags, cmd.DataBlock})
+	ok := t.engine.Set(cmd.Key, store.Value{cmd.Flags, 0, cmd.DataBlock})
 	if ok {
 		return t.messageBuffer.Write(TextStoredResponse{})
 	} else {
 		// TODO: this should never fail. if it does write a server error
 		return t.messageBuffer.Write(TextNotStoredResponse{})
 	}
+}
+
+func (t *TextProtocolSession) serveGetAndGets(cmd *RetrievalCommand) error {
+	results := map[string]store.Value{}
+	for _, k := range cmd.keys {
+		v, ok := t.engine.Get(k)
+		if ok {
+			results[k] = v
+		}
+	}
+	return t.messageBuffer.Write(TextGetOrGetsResponse{values: results, withCasUniq: cmd.Typ == GetsCommand})
 }
 
 func (t *TextProtocolSession) serveDelete(cmd *DeleteCommand) error {
