@@ -59,7 +59,7 @@ func (t *TextProtocolSession) Serve() error {
 			case PrependCommand:
 				err = errors.New("prepend not yet implemented")
 			case CasCommand:
-				err = errors.New("cas not yet implemented")
+				err = t.serveCas(cmd.storageCommand)
 			}
 		} else if cmd.retrievalCommand != nil {
 			switch cmd.retrievalCommand.Typ {
@@ -82,6 +82,17 @@ func (t *TextProtocolSession) serveSet(cmd *StorageCommand) error {
 	} else {
 		// TODO: this should never fail. if it does write a server error
 		return t.messageBuffer.Write(TextNotStoredResponse{})
+	}
+}
+
+func (t *TextProtocolSession) serveCas(cmd *StorageCommand) error {
+	exists, notFound := t.engine.Cas(cmd.Key, store.Value{cmd.Flags, cmd.CasUnique, cmd.DataBlock})
+	if exists {
+		return t.messageBuffer.Write(TextExistsResponse{})
+	} else if notFound {
+		return t.messageBuffer.Write(TextNotFoundResponse{})
+	} else {
+		return t.messageBuffer.Write(TextStoredResponse{})
 	}
 }
 

@@ -13,8 +13,9 @@ type Value struct {
 type StorageEngine interface {
 	// TODO: consider working with immutable []byte so callers
 	// cannot alter data
-	Set(key string, value Value) bool
+	Set(key string, value Value) (ok bool)
 	Get(key string) (value Value, found bool)
+	Cas(key string, value Value) (exists, notFound bool)
 	Delete(key string) bool
 }
 
@@ -32,8 +33,8 @@ type SimpleStorageEngine struct {
 func (s *SimpleStorageEngine) Set(key string, value Value) bool {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	value.CasUnique = s.curCasUnique
 	s.curCasUnique++
+	value.CasUnique = s.curCasUnique
 	s.values[key] = value
 	return true
 }
@@ -42,6 +43,24 @@ func (s *SimpleStorageEngine) Get(key string) (value Value, found bool) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	value, found = s.values[key]
+	return
+}
+
+func (s *SimpleStorageEngine) Cas(key string, value Value) (exists, notFound bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	val, ok := s.values[key]
+	if !ok {
+		notFound = true
+		return
+	}
+	if val.CasUnique != value.CasUnique {
+		exists = true
+		return
+	}
+	s.curCasUnique++
+	value.CasUnique = s.curCasUnique
+	s.values[key] = value
 	return
 }
 
