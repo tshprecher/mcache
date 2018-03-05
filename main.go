@@ -7,14 +7,10 @@ import (
 	"sync"
 )
 
-var storageEngine store.StorageEngine
-
 func main() {
 	flag.Parse()
 	glog.Infof("initializing storage engine...")
-	storageEngine = store.NewSimpleStorageEngine()
-
-	server := &Server{11211, nil, sync.Mutex{}}
+	server := &Server{11211, store.NewSimpleStorageEngine(), nil, sync.Mutex{}}
 	err := server.Start()
 	if err != nil {
 		glog.Fatal(err)

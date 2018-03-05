@@ -7,15 +7,15 @@ import (
 )
 
 // TODO: honor noreply
-type TextProtocolSession struct {
+type TextSession struct {
 	conn          net.Conn
 	messageBuffer MessageBuffer
 	engine        store.StorageEngine
 	alive         bool
 }
 
-func NewTextProtocolSession(conn net.Conn, engine store.StorageEngine) *TextProtocolSession {
-	return &TextProtocolSession{
+func NewTextProtocolSession(conn net.Conn, engine store.StorageEngine) *TextSession {
+	return &TextSession{
 		conn:          conn,
 		messageBuffer: NewTextProtocolMessageBuffer(conn, conn),
 		engine:        engine,
@@ -23,17 +23,21 @@ func NewTextProtocolSession(conn net.Conn, engine store.StorageEngine) *TextProt
 	}
 }
 
-func (t *TextProtocolSession) Alive() bool {
+func (t *TextSession) RemoteAddr() net.Addr {
+	return t.conn.RemoteAddr()
+}
+
+func (t *TextSession) Alive() bool {
 	return t.alive
 }
 
-func (t *TextProtocolSession) Close() error {
+func (t *TextSession) Close() error {
 	err := t.conn.Close()
 	t.alive = false
 	return err
 }
 
-func (t *TextProtocolSession) Serve() error {
+func (t *TextSession) Serve() error {
 	if !t.alive {
 		return errors.New("cannot serve a dead session")
 	}
@@ -75,7 +79,7 @@ func (t *TextProtocolSession) Serve() error {
 	return err
 }
 
-func (t *TextProtocolSession) serveSet(cmd *StorageCommand) error {
+func (t *TextSession) serveSet(cmd *StorageCommand) error {
 	ok := t.engine.Set(cmd.Key, store.Value{cmd.Flags, 0, cmd.DataBlock})
 	if ok {
 		return t.messageBuffer.Write(TextStoredResponse{})
@@ -85,7 +89,7 @@ func (t *TextProtocolSession) serveSet(cmd *StorageCommand) error {
 	}
 }
 
-func (t *TextProtocolSession) serveCas(cmd *StorageCommand) error {
+func (t *TextSession) serveCas(cmd *StorageCommand) error {
 	exists, notFound := t.engine.Cas(cmd.Key, store.Value{cmd.Flags, cmd.CasUnique, cmd.DataBlock})
 	if exists {
 		return t.messageBuffer.Write(TextExistsResponse{})
@@ -96,7 +100,7 @@ func (t *TextProtocolSession) serveCas(cmd *StorageCommand) error {
 	}
 }
 
-func (t *TextProtocolSession) serveGetAndGets(cmd *RetrievalCommand) error {
+func (t *TextSession) serveGetAndGets(cmd *RetrievalCommand) error {
 	results := map[string]store.Value{}
 	for _, k := range cmd.keys {
 		v, ok := t.engine.Get(k)
@@ -107,7 +111,7 @@ func (t *TextProtocolSession) serveGetAndGets(cmd *RetrievalCommand) error {
 	return t.messageBuffer.Write(TextGetOrGetsResponse{values: results, withCasUniq: cmd.Typ == GetsCommand})
 }
 
-func (t *TextProtocolSession) serveDelete(cmd *DeleteCommand) error {
+func (t *TextSession) serveDelete(cmd *DeleteCommand) error {
 	ok := t.engine.Delete(cmd.Key)
 	if ok {
 		return t.messageBuffer.Write(TextDeletedResponse{})

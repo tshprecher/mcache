@@ -6,11 +6,11 @@ import (
 	"github.com/tshprecher/mcache/protocol"
 	"net"
 	"sync"
+	"github.com/tshprecher/mcache/store"
 )
 
-func handleConn(conn net.Conn) {
-	session := protocol.NewTextProtocolSession(conn, storageEngine)
-	glog.Infof("session started: addr=%v", conn.RemoteAddr())
+func handleSession(session *protocol.TextSession) {
+	glog.Infof("session started: addr=%v", session.RemoteAddr())
 	for session.Alive() {
 		err := session.Serve()
 		if nerr, ok := err.(net.Error); ok && !nerr.Temporary() { // != nil /* && err != io.EOF*/ {
@@ -18,19 +18,20 @@ func handleConn(conn net.Conn) {
 			session.Close()
 		}
 	}
-	glog.Infof("session ended: addr=%v", conn.RemoteAddr())
+	glog.Infof("session ended: addr=%v", session.RemoteAddr())
 }
 
 type Server struct {
-	port     uint16
-	listener net.Listener
-	mu       sync.Mutex
+	port uint16
+	se   store.StorageEngine
+	lis  net.Listener
+	mu   sync.Mutex
 }
 
 func (s *Server) setListener(l net.Listener) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	s.listener = l
+	s.lis = l
 }
 
 func (s *Server) Start() error {
@@ -41,13 +42,13 @@ func (s *Server) Start() error {
 	}
 	s.setListener(listener)
 	for {
-		conn, err := s.listener.Accept()
+		conn, err := s.lis.Accept()
 		if err != nil {
 			glog.Warningf(err.Error())
-			s.listener = nil
+			s.lis = nil
 			break
 		}
-		go handleConn(conn)
+		go handleSession(protocol.NewTextProtocolSession(conn, s.se))
 	}
 	return nil
 }
@@ -55,9 +56,9 @@ func (s *Server) Start() error {
 func (s *Server) Stop() {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if s.listener == nil {
+	if s.lis == nil {
 		return
 	}
 	glog.Info("stopping server...")
-	s.listener.Close()
+	s.lis.Close()
 }

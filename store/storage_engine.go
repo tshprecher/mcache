@@ -19,7 +19,7 @@ type StorageEngine interface {
 	Delete(key string) bool
 }
 
-func NewSimpleStorageEngine() StorageEngine {
+func NewSimpleStorageEngine() *SimpleStorageEngine {
 	return &SimpleStorageEngine{map[string]Value{}, 0, sync.Mutex{}}
 }
 
