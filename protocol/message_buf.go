@@ -66,7 +66,6 @@ func (t *textProtocolMessageBuffer) Write(r Response) (err error) {
 
 func (t *textProtocolMessageBuffer) Read() (cmd *Command, err error) {
 	// TODO: impose proper limits on the input message
-
 	// if the header is not read, try reading it first
 	if t.cmdType == -1 {
 		err = t.readHeader()
@@ -102,7 +101,7 @@ func (t *textProtocolMessageBuffer) readHeader() error {
 		return err
 	}
 	for n > 0 {
-		//		log.Printf("DEBUG A: read header byte %v\n", b[0])
+		//glog.Infof("DEBUG A: read header byte %v\n", b[0])
 		t.cmdHeader.Write(b[0:1])
 		// TODO: this is slow. fix later once end-to-end solution works
 		bytes := t.cmdHeader.Bytes()
@@ -241,15 +240,12 @@ func (t *textProtocolMessageBuffer) unpackStorageCommand(typ int, terms []string
 
 func (t *textProtocolMessageBuffer) readDataBlock() error {
 	b := [1]byte{}
-	n, err := t.wireIn.Read(b[0:1])
-	if n == 0 && err != nil {
-		return err
-	}
 	for len(t.curCmd.storageCommand.DataBlock) < int(t.curCmd.storageCommand.NumBytes)+2 {
-		//		log.Printf("DEBUG B: read body byte %v\n", b[0])
+		//glog.Infof("DEBUG B: read body byte %v\n", b[0])
+		// TODO: handle the error here?
+		n, _ := t.wireIn.Read(b[0:1])
 		if n > 0 {
 			t.curCmd.storageCommand.DataBlock = append(t.curCmd.storageCommand.DataBlock, b[0:1]...)
-			n, err = t.wireIn.Read(b[0:1])
 		} else {
 			break
 		}
