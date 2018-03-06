@@ -5,6 +5,7 @@ import (
 	"github.com/golang/glog"
 	"github.com/tshprecher/mcache/protocol"
 	"github.com/tshprecher/mcache/store"
+	"io"
 	"net"
 	"sync"
 )
@@ -13,8 +14,13 @@ func handleSession(session *protocol.TextSession) {
 	glog.Infof("session started: addr=%v", session.RemoteAddr())
 	for session.Alive() {
 		err := session.Serve()
-		if nerr, ok := err.(net.Error); ok && !nerr.Temporary() {
-			glog.Errorf("error serving: %v", nerr)
+		if nerr, ok := err.(net.Error); ok {
+			if !nerr.Temporary() {
+				glog.Errorf("error serving: %v", nerr)
+				session.Close()
+			}
+		} else if err != nil && err != io.EOF {
+			glog.Errorf("error serving: %v", err)
 			session.Close()
 		}
 	}
@@ -22,10 +28,11 @@ func handleSession(session *protocol.TextSession) {
 }
 
 type Server struct {
-	port uint16
-	se   store.StorageEngine
-	lis  net.Listener
-	mu   sync.Mutex
+	port    uint16
+	se      store.StorageEngine
+	lis     net.Listener
+	timeout int
+	mu      sync.Mutex
 }
 
 func (s *Server) setListener(l net.Listener) {
@@ -48,7 +55,7 @@ func (s *Server) Start() error {
 			s.lis = nil
 			break
 		}
-		go handleSession(protocol.NewTextProtocolSession(conn, s.se))
+		go handleSession(protocol.NewTextProtocolSession(conn, s.se, s.timeout))
 	}
 	return nil
 }

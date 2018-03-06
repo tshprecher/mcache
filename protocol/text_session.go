@@ -4,6 +4,7 @@ import (
 	"errors"
 	"github.com/tshprecher/mcache/store"
 	"net"
+	"time"
 )
 
 // TODO: honor noreply
@@ -12,14 +13,18 @@ type TextSession struct {
 	messageBuffer MessageBuffer
 	engine        store.StorageEngine
 	alive         bool
+	timeout       int
+	lastActive    time.Time
 }
 
-func NewTextProtocolSession(conn net.Conn, engine store.StorageEngine) *TextSession {
+func NewTextProtocolSession(conn net.Conn, engine store.StorageEngine, timeout int) *TextSession {
 	return &TextSession{
 		conn:          conn,
 		messageBuffer: NewTextProtocolMessageBuffer(conn, conn),
 		engine:        engine,
 		alive:         true,
+		timeout:       timeout,
+		lastActive:    time.Now(),
 	}
 }
 
@@ -42,6 +47,9 @@ func (t *TextSession) Serve() error {
 		return errors.New("cannot serve a dead session")
 	}
 	cmd, err := t.messageBuffer.Read()
+	if cmd == nil && time.Since(t.lastActive) >= time.Duration(t.timeout*1e9) {
+		return errors.New("session timed out")
+	}
 	if err != nil {
 		// write an error and close the connection
 		// TODO: distinguish between recoverable and non recoverable errors?
@@ -50,6 +58,7 @@ func (t *TextSession) Serve() error {
 	}
 
 	if cmd != nil {
+		t.lastActive = time.Now()
 		if cmd.storageCommand != nil {
 			switch cmd.storageCommand.Typ {
 			case SetCommand:
@@ -84,7 +93,7 @@ func (t *TextSession) serveSet(cmd *StorageCommand) error {
 	if ok {
 		return t.messageBuffer.Write(TextStoredResponse{})
 	} else {
-		// TODO: this should never fail. if it does write a server error
+		// TODO: this can't fail. if it does write a server error
 		return t.messageBuffer.Write(TextNotStoredResponse{})
 	}
 }
