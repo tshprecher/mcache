@@ -4,16 +4,16 @@ import (
 	"fmt"
 	"github.com/golang/glog"
 	"github.com/tshprecher/mcache/protocol"
+	"github.com/tshprecher/mcache/store"
 	"net"
 	"sync"
-	"github.com/tshprecher/mcache/store"
 )
 
 func handleSession(session *protocol.TextSession) {
 	glog.Infof("session started: addr=%v", session.RemoteAddr())
 	for session.Alive() {
 		err := session.Serve()
-		if nerr, ok := err.(net.Error); ok && !nerr.Temporary() { // != nil /* && err != io.EOF*/ {
+		if nerr, ok := err.(net.Error); ok && !nerr.Temporary() {
 			glog.Errorf("error serving: %v", nerr)
 			session.Close()
 		}

@@ -160,4 +160,3 @@ func testCas(t *testing.T) {
 		t.Errorf("expected nil error, received %v", err)
 	}
 }
-
