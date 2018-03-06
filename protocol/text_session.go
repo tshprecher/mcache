@@ -51,6 +51,15 @@ func (t *TextSession) Serve() error {
 		return errors.New("session timed out")
 	}
 	if err != nil {
+		if perr, ok := err.(*ProtocolError); ok {
+			if perr.IsStandardErr() {
+				t.messageBuffer.Write(TextErrorResponse{})
+			} else if perr.IsClientErr() {
+				t.messageBuffer.Write(TextClientErrorResponse{perr.Error()})
+			} else if perr.IsServerErr() {
+				t.messageBuffer.Write(TextServerErrorResponse{perr.Error()})
+			}
+		}
 		// write an error and close the connection
 		// TODO: distinguish between recoverable and non recoverable errors?
 		// TODO: add logging where appropriate

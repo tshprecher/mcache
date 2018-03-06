@@ -3,25 +3,42 @@ package protocol
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"github.com/golang/glog"
 	"io"
 	"strconv"
 	"strings"
 )
 
-var _ MessageBuffer = &textProtocolMessageBuffer{}
+var (
+	// protocol errors
+	invalidStorageCommand = NewClientProtocolError("storage commands must take exactly 5 or 6 terms")
+	invalidDeleteCommand  = NewClientProtocolError("delete must take exactly 2 or 3 terms")
+	invalidKey            = NewClientProtocolError("malformed key")
+	invalidFlags          = NewClientProtocolError("malformed flags")
+	invalidExpTime        = NewClientProtocolError("malformed exptime")
+	invalidBytes          = NewClientProtocolError("malformed bytes")
+	invalidCasUniq        = NewClientProtocolError("malformed cas_unique")
+	noReplyExpected       = NewClientProtocolError("expected 'noreply' as last term")
+	commandLineTooLong    = NewClientProtocolError(fmt.Sprintf("command line exceeding %d bytes", MaxCommandLength))
 
-var cmdStringToType = map[string]int{
-	"set":     SetCommand,
-	"add":     AddCommand,
-	"replace": ReplaceCommand,
-	"append":  AppendCommand,
-	"prepend": PrependCommand,
-	"cas":     CasCommand,
-	"get":     GetCommand,
-	"gets":    GetsCommand,
-	"delete":  DelCommand,
-}
+	commandNotFound = NewStdProtocolError()
+
+	// map the input string to command type
+	cmdStringToType = map[string]int{
+		"set":     SetCommand,
+		"add":     AddCommand,
+		"replace": ReplaceCommand,
+		"append":  AppendCommand,
+		"prepend": PrependCommand,
+		"cas":     CasCommand,
+		"get":     GetCommand,
+		"gets":    GetsCommand,
+		"delete":  DelCommand,
+	}
+
+	_ MessageBuffer = &textProtocolMessageBuffer{}
+)
 
 type MessageBuffer interface {
 	Read() (*Command, error)
@@ -65,7 +82,6 @@ func (t *textProtocolMessageBuffer) Write(r Response) (err error) {
 }
 
 func (t *textProtocolMessageBuffer) Read() (cmd *Command, err error) {
-	// TODO: impose proper limits on the input message
 	// if the header is not read, try reading it first
 	if t.cmdType == -1 {
 		err = t.readHeader()
@@ -94,7 +110,6 @@ func (t *textProtocolMessageBuffer) Read() (cmd *Command, err error) {
 }
 
 func (t *textProtocolMessageBuffer) readHeader() error {
-	// TODO: handle unusually long headers with an error
 	b := [1]byte{}
 	n, err := t.wireIn.Read(b[0:1])
 	if n == 0 && err != nil {
@@ -102,6 +117,9 @@ func (t *textProtocolMessageBuffer) readHeader() error {
 	}
 	for n > 0 {
 		//glog.Infof("DEBUG A: read header byte %v\n", b[0])
+		if t.cmdHeader.Len() > MaxCommandLength {
+			return commandLineTooLong
+		}
 		t.cmdHeader.Write(b[0:1])
 		bytes := t.cmdHeader.Bytes()
 		if len(bytes) >= 2 && bytes[len(bytes)-1] == '\n' && bytes[len(bytes)-2] == '\r' {
@@ -117,13 +135,12 @@ func (t *textProtocolMessageBuffer) readHeader() error {
 func (t *textProtocolMessageBuffer) parseHeader(bytes []byte) (err error) {
 	terms := strings.Split(strings.TrimSpace(string(bytes)), " ")
 	if len(terms) == 0 {
-		// TODO: consolidate errors up top
-		err = errors.New("invalid command: empty command line")
+		err = commandNotFound
 		return
 	}
 	typ, ok := cmdStringToType[terms[0]]
 	if !ok {
-		err = errors.New("invalid command: command not found")
+		err = commandNotFound
 		return
 	}
 	if IsStorageCommand(typ) {
@@ -138,14 +155,14 @@ func (t *textProtocolMessageBuffer) parseHeader(bytes []byte) (err error) {
 
 func (t *textProtocolMessageBuffer) validateKey(key string) error {
 	if len(key) > MaxKeyLength || !keyRegex.MatchString(key) {
-		return errors.New("invalid command: malformed key")
+		return invalidKey
 	}
 	return nil
 }
 
 func (t *textProtocolMessageBuffer) unpackDeleteCommand(typ int, terms []string) error {
 	if len(terms) < 2 || len(terms) > 3 {
-		return errors.New("invalid command: delete must take exactly 2 or 3 terms")
+		return invalidDeleteCommand
 	}
 	key := terms[1]
 	err := t.validateKey(key)
@@ -157,7 +174,7 @@ func (t *textProtocolMessageBuffer) unpackDeleteCommand(typ int, terms []string)
 		if terms[2] == "noreply" {
 			noReply = true
 		} else {
-			return errors.New("invalid command: expected 'noreply' as last term")
+			return noReplyExpected
 		}
 	}
 	t.cmdType = typ
@@ -186,7 +203,7 @@ func (t *textProtocolMessageBuffer) unpackRetrievalCommand(typ int, terms []stri
 
 func (t *textProtocolMessageBuffer) unpackStorageCommand(typ int, terms []string) error {
 	if len(terms) < 5 || len(terms) > 7 {
-		return errors.New("invalid command: storage commands must take exactly 5 or 6 terms")
+		return invalidStorageCommand
 	}
 	key := terms[1]
 	err := t.validateKey(key)
@@ -195,21 +212,21 @@ func (t *textProtocolMessageBuffer) unpackStorageCommand(typ int, terms []string
 	}
 	flags, err := strconv.ParseUint(terms[2], 10, 16)
 	if err != nil {
-		return errors.New("invalid command: malformed flags")
+		return invalidFlags
 	}
 	expTime, err := strconv.ParseInt(terms[3], 10, 32)
 	if err != nil {
-		return errors.New("invalid command: malformed exptime")
+		return invalidExpTime
 	}
 	numBytes, err := strconv.ParseUint(terms[4], 10, 32)
 	if err != nil {
-		return errors.New("invalid command: malformed bytes")
+		return invalidBytes
 	}
 	var casUnique int64
 	if typ == CasCommand {
 		casUnique, err = strconv.ParseInt(terms[5], 10, 64)
 		if err != nil {
-			return errors.New("invalid command: malformed cas_unique")
+			return invalidCasUniq
 		}
 	}
 	noReply := false
@@ -217,7 +234,7 @@ func (t *textProtocolMessageBuffer) unpackStorageCommand(typ int, terms []string
 		if terms[len(terms)-1] == "noreply" {
 			noReply = true
 		} else {
-			return errors.New("invalid command: expected 'noreply' as last term")
+			return noReplyExpected
 		}
 	}
 

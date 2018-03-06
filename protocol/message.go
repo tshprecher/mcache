@@ -11,7 +11,8 @@ import (
 )
 
 const (
-	MaxKeyLength = 250
+	MaxKeyLength     = 250
+	MaxCommandLength = 300
 
 	// the six storage commands
 	SetCommand = iota
@@ -46,7 +47,26 @@ func IsDeleteCommand(typ int) bool {
 	return typ == DelCommand
 }
 
-/////
+type ProtocolError struct {
+	stdErr, clientErr, serverErr bool
+	msg                          string
+}
+
+func (p *ProtocolError) Error() string { return p.msg }
+
+func (p *ProtocolError) IsStandardErr() bool { return p.stdErr }
+
+func (p *ProtocolError) IsClientErr() bool { return p.clientErr }
+
+func (p *ProtocolError) IsServerErr() bool { return p.serverErr }
+
+func NewStdProtocolError() *ProtocolError { return &ProtocolError{true, false, false, ""} }
+
+func NewClientProtocolError(msg string) *ProtocolError { return &ProtocolError{false, true, false, msg} }
+
+func NewServerProtocolError(msg string) *ProtocolError { return &ProtocolError{false, false, true, msg} }
+
+///
 
 type StorageCommand struct {
 	// header fields
@@ -111,16 +131,19 @@ type TextNotFoundResponse struct{}
 
 func (_ TextNotFoundResponse) Bytes() []byte { return []byte("NOT_FOUND\r\n") }
 
+// A TextErrorResponse builds the "ERROR" response
 type TextErrorResponse struct{}
 
 func (_ TextErrorResponse) Bytes() []byte { return []byte("ERROR\r\n") }
 
+// A TextClientErrorResponse builds the "CLIENT_ERROR" response
 type TextClientErrorResponse struct{ msg string }
 
 func (t TextClientErrorResponse) Bytes() []byte {
 	return []byte(fmt.Sprintf("CLIENT_ERROR %s\r\n", t.msg))
 }
 
+// A TextServerErrorResponse builds the "SERVER_ERROR" response
 type TextServerErrorResponse struct{ msg string }
 
 func (t TextServerErrorResponse) Bytes() []byte {
