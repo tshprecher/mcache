@@ -52,7 +52,7 @@ func expectCommandEquals(t *testing.T, expected, actual *Command) {
 	if expected.storageCommand != nil {
 		expectEquals(t, *expected.storageCommand, *actual.storageCommand)
 	} else if expected.retrievalCommand != nil {
-		panic("TODO: implement retrieval equals")
+		expectEquals(t, *expected.retrievalCommand, *actual.retrievalCommand)
 	} else if expected.deleteCommand != nil {
 		expectEquals(t, *expected.deleteCommand, *actual.deleteCommand)
 	}
@@ -110,7 +110,27 @@ func TestTextReadSplitPackets(t *testing.T) {
 	testTextRead(t, buf, wireIn, packets, expResults)
 }
 
-func TestTextReadSetCommand(t *testing.T) {
+func TestTextReadRetrievalCommand(t *testing.T) {
+	packets := [][]byte{
+		[]byte("get key key2\r\n"),
+	}
+	expResults := []readResult{
+		readResult{
+			cmd: &Command{
+				retrievalCommand: &RetrievalCommand{
+					Typ:  GetCommand,
+					keys: []string{"key", "key2"},
+				},
+			},
+			err: nil,
+		},
+	}
+	wireIn, wireOut := &bytes.Buffer{}, &bytes.Buffer{}
+	buf := NewTextProtocolMessageBuffer(wireIn, wireOut)
+	testTextRead(t, buf, wireIn, packets, expResults)
+}
+
+func TestTextReadStorageCommand(t *testing.T) {
 	packets := [][]byte{
 		[]byte("set my_key 3 2 1\r\n1\r\n"),
 	}

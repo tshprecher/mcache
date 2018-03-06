@@ -78,58 +78,75 @@ type Command struct {
 	deleteCommand    *DeleteCommand
 }
 
-////
-
+// Response represents a complete memcache protocol message
+// in response to a client command
 type Response interface {
+	// Bytes returns all the bytes for the intended message
+	// to be written to the client
 	Bytes() []byte
 }
 
-////
-
+// A TextStoredResponse builds the "STORED" response
 type TextStoredResponse struct{}
 
-func (_ TextStoredResponse) Bytes() []byte {
-	return []byte("STORED\r\n")
-}
+func (_ TextStoredResponse) Bytes() []byte { return []byte("STORED\r\n") }
 
+// A TextNotStoredResponse builds the "NOT_STORED" response
 type TextNotStoredResponse struct{}
 
-func (_ TextNotStoredResponse) Bytes() []byte {
-	return []byte("NOT_STORED\r\n")
-}
+func (_ TextNotStoredResponse) Bytes() []byte { return []byte("NOT_STORED\r\n") }
 
+// A TextExistsResponse builds the "EXISTS" response
 type TextExistsResponse struct{}
 
-func (_ TextExistsResponse) Bytes() []byte {
-	return []byte("EXISTS\r\n")
-}
+func (_ TextExistsResponse) Bytes() []byte { return []byte("EXISTS\r\n") }
 
+// A TextDeletedResponse builds the "DELETED" response
 type TextDeletedResponse struct{}
 
-func (_ TextDeletedResponse) Bytes() []byte {
-	return []byte("DELETED\r\n")
-}
+func (_ TextDeletedResponse) Bytes() []byte { return []byte("DELETED\r\n") }
 
+// A TextNotFoundResponse builds the "NOT_FOUND" response
 type TextNotFoundResponse struct{}
 
-func (_ TextNotFoundResponse) Bytes() []byte {
-	return []byte("NOT_FOUND\r\n")
+func (_ TextNotFoundResponse) Bytes() []byte { return []byte("NOT_FOUND\r\n") }
+
+type TextErrorResponse struct{}
+
+func (_ TextErrorResponse) Bytes() []byte { return []byte("ERROR\r\n") }
+
+type TextClientErrorResponse struct{ msg string }
+
+func (t TextClientErrorResponse) Bytes() []byte {
+	return []byte(fmt.Sprintf("CLIENT_ERROR %s\r\n", t.msg))
 }
 
+type TextServerErrorResponse struct{ msg string }
+
+func (t TextServerErrorResponse) Bytes() []byte {
+	return []byte(fmt.Sprintf("SERVER_ERROR %s\r\n", t.msg))
+}
+
+// A TextGetOrGetsResponse builds responses for get and gets commands
+// given a slice of Values to return to the client. The withCasUniq flag
+// should be true if and only if the intended response is for a gets command.
 type TextGetOrGetsResponse struct {
-	values      map[string]store.Value
+	pairs []struct {
+		k string
+		v store.Value
+	}
 	withCasUniq bool
 }
 
 func (t TextGetOrGetsResponse) Bytes() []byte {
 	buf := &bytes.Buffer{}
-	for k, v := range t.values {
+	for _, p := range t.pairs {
 		if t.withCasUniq {
-			buf.WriteString(fmt.Sprintf("VALUE %s %d %d %d\r\n", k, v.Flags, len(v.Bytes), v.CasUnique))
+			buf.WriteString(fmt.Sprintf("VALUE %s %d %d %d\r\n", p.k, p.v.Flags, len(p.v.Bytes), p.v.CasUnique))
 		} else {
-			buf.WriteString(fmt.Sprintf("VALUE %s %d %d\r\n", k, v.Flags, len(v.Bytes)))
+			buf.WriteString(fmt.Sprintf("VALUE %s %d %d\r\n", p.k, p.v.Flags, len(p.v.Bytes)))
 		}
-		buf.Write(v.Bytes)
+		buf.Write(p.v.Bytes)
 		buf.WriteString("\r\n")
 	}
 	buf.WriteString("END\r\n")

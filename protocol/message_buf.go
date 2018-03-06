@@ -103,7 +103,6 @@ func (t *textProtocolMessageBuffer) readHeader() error {
 	for n > 0 {
 		//glog.Infof("DEBUG A: read header byte %v\n", b[0])
 		t.cmdHeader.Write(b[0:1])
-		// TODO: this is slow. fix later once end-to-end solution works
 		bytes := t.cmdHeader.Bytes()
 		if len(bytes) >= 2 && bytes[len(bytes)-1] == '\n' && bytes[len(bytes)-2] == '\r' {
 			// reached the end of the cmd header so parse it.
@@ -242,7 +241,6 @@ func (t *textProtocolMessageBuffer) readDataBlock() error {
 	b := [1]byte{}
 	for len(t.curCmd.storageCommand.DataBlock) < int(t.curCmd.storageCommand.NumBytes)+2 {
 		//glog.Infof("DEBUG B: read body byte %v\n", b[0])
-		// TODO: handle the error here?
 		n, _ := t.wireIn.Read(b[0:1])
 		if n > 0 {
 			t.curCmd.storageCommand.DataBlock = append(t.curCmd.storageCommand.DataBlock, b[0:1]...)

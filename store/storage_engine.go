@@ -22,7 +22,6 @@ func NewSimpleStorageEngine(ep EvictionPolicy) *SimpleStorageEngine {
 	return &SimpleStorageEngine{map[string]Value{}, ep, 0, sync.Mutex{}}
 }
 
-// TODO: add memory limits
 type SimpleStorageEngine struct {
 	values       map[string]Value
 	ep           EvictionPolicy

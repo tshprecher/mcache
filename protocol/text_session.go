@@ -101,15 +101,20 @@ func (t *TextSession) serveCas(cmd *StorageCommand) error {
 }
 
 func (t *TextSession) serveGetAndGets(cmd *RetrievalCommand) error {
-	// TODO: should be a list. dups are allowed per twemcache
-	results := map[string]store.Value{}
+	results := []struct {
+		k string
+		v store.Value
+	}{}
 	for _, k := range cmd.keys {
 		v, ok := t.engine.Get(k)
 		if ok {
-			results[k] = v
+			results = append(results, struct {
+				k string
+				v store.Value
+			}{k, v})
 		}
 	}
-	return t.messageBuffer.Write(TextGetOrGetsResponse{values: results, withCasUniq: cmd.Typ == GetsCommand})
+	return t.messageBuffer.Write(TextGetOrGetsResponse{pairs: results, withCasUniq: cmd.Typ == GetsCommand})
 }
 
 func (t *TextSession) serveDelete(cmd *DeleteCommand) error {
