@@ -17,6 +17,7 @@ type EvictionPolicy interface {
 	Used() int
 	Touch(key string) bool
 	Add(key string, v Value) (evict []string, hasSpace bool)
+	Remove(key string) bool
 }
 
 type lruEvictionPolicy struct {
@@ -81,18 +82,29 @@ func (l *lruEvictionPolicy) Add(key string, v Value) (evict []string, hasSpace b
 		l.used -= kvSize(lruNode.key, lruNode.val)
 		delete(l.kvMap, lruNode.key)
 		l.sentinel.prev = lruNode.prev
-		l.sentinel.prev = l.sentinel
+		l.sentinel.prev.next = l.sentinel
 		evict = append(evict, lruNode.key)
 	}
 
 	// finally, add the new node to the front of the list (most recent)
 	node := &kvListNode{key, v, nil, nil}
-	l.sentinel.next.prev = node
 	node.next = l.sentinel.next
 	node.prev = l.sentinel
-	l.sentinel = node
+	node.next.prev = node
+	l.sentinel.next = node
 	l.kvMap[key] = node
 	l.used += size - existingSize
 
 	return
+}
+
+func (l *lruEvictionPolicy) Remove(key string) bool {
+	node, ok := l.kvMap[key]
+	if !ok {
+		return false
+	}
+	delete(l.kvMap, key)
+	node.prev.next = node.next
+	node.next.prev = node.prev
+	return true
 }

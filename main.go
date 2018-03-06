@@ -7,10 +7,16 @@ import (
 	"sync"
 )
 
+var (
+	// flags
+	port = flag.Int("port", 11211, "server port")
+	cap  = flag.Int("cap", 1024*1024*1024, "total capacity in bytes")
+)
+
 func main() {
 	flag.Parse()
 	glog.Infof("initializing storage engine...")
-	server := &Server{11211, store.NewSimpleStorageEngine(), nil, sync.Mutex{}}
+	server := &Server{uint16(*port), store.NewSimpleStorageEngine(store.NewLruEvictionPolicy(*cap)), nil, sync.Mutex{}}
 	err := server.Start()
 	if err != nil {
 		glog.Fatal(err)

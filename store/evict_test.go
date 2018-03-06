@@ -39,7 +39,8 @@ func TestLruTouchExisting(t *testing.T) {
 	if !ok {
 		t.Errorf("expected successful touch")
 	}
-	if !(p.sentinel.next == node2 && node2.next == node1 && node1.next == node3) {
+	if !(p.sentinel.next == node2 && node2.next == node1 && node1.next == node3 && node3.next == p.sentinel) ||
+		!(node3.prev == node1 && node1.prev == node2 && node2.prev == p.sentinel && p.sentinel.prev == node3) {
 		t.Errorf("expected order key2, key1, key3 but received %v, %v, %v",
 			p.sentinel.next.key, p.sentinel.next.next.key, p.sentinel.next.next.next.key)
 	}
@@ -49,9 +50,39 @@ func TestLruTouchExisting(t *testing.T) {
 	if !ok {
 		t.Errorf("expected successful touch")
 	}
-	if !(p.sentinel.next == node3 && node3.next == node2 && node2.next == node1) {
+	if !(p.sentinel.next == node3 && node3.next == node2 && node2.next == node1 && node1.next == p.sentinel) ||
+		!(node1.prev == node2 && node2.prev == node3 && node3.prev == p.sentinel && p.sentinel.prev == node1) {
 		t.Errorf("expected order key3, key2, key1 but received %v, %v, %v",
 			p.sentinel.next.key, p.sentinel.next.next.key, p.sentinel.next.next.next.key)
+	}
+}
+
+func TestLruDelete(t *testing.T) {
+	p := NewLruEvictionPolicy(32)
+	p.Add("key1", Value{0, 0, []byte{0}})
+	p.Add("key2", Value{0, 0, []byte{0}})
+
+	if len(p.kvMap) != 2 {
+		t.Errorf("expected 2 elements in kvMap, received %d", len(p.kvMap))
+	}
+
+	p.Remove("unknown")
+	if len(p.kvMap) != 2 {
+		t.Errorf("expected 2 elements in kvMap, received %d", len(p.kvMap))
+	}
+
+	p.Remove("key1")
+	if len(p.kvMap) != 1 {
+		t.Errorf("expected 1 element in kvMap, received %d", len(p.kvMap))
+	}
+
+	p.Remove("key2")
+	if len(p.kvMap) != 0 {
+		t.Errorf("expected 0 elements in kvMap, received %d", len(p.kvMap))
+	}
+
+	if p.sentinel.prev != p.sentinel {
+		t.Error("expected 0 elements in list")
 	}
 }
 

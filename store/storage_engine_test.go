@@ -121,6 +121,6 @@ func testCas(t *testing.T, s StorageEngine) {
 }
 
 func TestSimpleStorageEngineCommon(t *testing.T) {
-	testAddGetDelete(t, NewSimpleStorageEngine())
-	testCas(t, NewSimpleStorageEngine())
+	testAddGetDelete(t, NewSimpleStorageEngine(NewLruEvictionPolicy(1024)))
+	testCas(t, NewSimpleStorageEngine(NewLruEvictionPolicy(1024)))
 }

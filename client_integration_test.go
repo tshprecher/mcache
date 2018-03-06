@@ -23,26 +23,26 @@ func itemValuesEqual(item1, item2 *memcache.Item) bool {
 // TODO: test case where value is empty (no bytes)
 func TestIntegration(t *testing.T) {
 	// spin up a server
-	se := store.NewSimpleStorageEngine()
+	se := store.NewSimpleStorageEngine(store.NewLruEvictionPolicy(1024))
 	server := &Server{11210, se, nil, sync.Mutex{}}
 	go server.Start()
 	time.Sleep(500 * time.Millisecond)
 
 	testSetAndGet(t)
 
-	*se = *store.NewSimpleStorageEngine()
+	*se = *store.NewSimpleStorageEngine(store.NewLruEvictionPolicy(1024))
 	testGets(t)
 
-	*se = *store.NewSimpleStorageEngine()
+	*se = *store.NewSimpleStorageEngine(store.NewLruEvictionPolicy(1024))
 	testMultipleSessions(t)
 
-	*se = *store.NewSimpleStorageEngine()
+	*se = *store.NewSimpleStorageEngine(store.NewLruEvictionPolicy(1024))
 	testDelete(t)
 
-	*se = *store.NewSimpleStorageEngine()
+	*se = *store.NewSimpleStorageEngine(store.NewLruEvictionPolicy(1024))
 	testDelete(t)
 
-	*se = *store.NewSimpleStorageEngine()
+	*se = *store.NewSimpleStorageEngine(store.NewLruEvictionPolicy(1024))
 	testCas(t)
 }
 
