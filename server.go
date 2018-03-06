@@ -10,6 +10,8 @@ import (
 	"sync"
 )
 
+// handleSession wraps a TextSession and polls TextSession.Serve().
+// If an error occurs, the session is promptly closed.
 func handleSession(session *protocol.TextSession) {
 	glog.Infof("session started: addr=%v", session.RemoteAddr())
 	for session.Alive() {
@@ -41,6 +43,9 @@ func (s *Server) setListener(l net.Listener) {
 	s.lis = l
 }
 
+// Start opens up a port to listen, wraps each client connection
+// inside a TextSession, and spins up a goroutine to serve that
+// session.
 func (s *Server) Start() error {
 	glog.Info("starting server...")
 	listener, err := net.Listen("tcp", fmt.Sprintf(":%d", s.port))
@@ -55,11 +60,14 @@ func (s *Server) Start() error {
 			s.lis = nil
 			break
 		}
-		go handleSession(protocol.NewTextProtocolSession(conn, s.se, s.timeout))
+		go handleSession(protocol.NewTextSession(conn, s.se, s.timeout))
 	}
 	return nil
 }
 
+// Stop stops the server from listening for new connections, but goroutines
+// serving existing connections will continue to run until those sessions
+// have ended.
 func (s *Server) Stop() {
 	s.mu.Lock()
 	defer s.mu.Unlock()

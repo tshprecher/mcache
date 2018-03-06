@@ -34,40 +34,55 @@ var (
 	keyRegex = regexp.MustCompile(`^[0-9a-zA-Z_]+$`)
 )
 
+// IsStorageCommand returns true if and only if the typ constant represents
+// a memcache storage command.
 func IsStorageCommand(typ int) bool {
 	return typ == SetCommand || typ == AddCommand || typ == ReplaceCommand ||
 		typ == AppendCommand || typ == PrependCommand || typ == CasCommand
 }
 
+// IsRetrievalCommand returns true if and only if the typ constant represents
+// a memcache retrieval command.
 func IsRetrievalCommand(typ int) bool {
 	return typ == GetCommand || typ == GetsCommand
 }
 
+// IsDeleteCommand returns true if and only if the typ constant represents
+// a memcache delete command.
 func IsDeleteCommand(typ int) bool {
 	return typ == DelCommand
 }
 
+// A ProtocolError is an error that also encapsulates its type with respect
+// to the memcache protocol: standard, client, or server. The proper error
+// response is sent to the client based on its type.
 type ProtocolError struct {
 	stdErr, clientErr, serverErr bool
 	msg                          string
 }
 
+// Error returns the message string in the case of client or server errors, "" otherwise.
 func (p *ProtocolError) Error() string { return p.msg }
 
+// IsStandardError returns true if this ProtocolError should write a std error to the client.
 func (p *ProtocolError) IsStandardErr() bool { return p.stdErr }
 
+// IsClientError returns true if this ProtocolError should write a client error to the client.
 func (p *ProtocolError) IsClientErr() bool { return p.clientErr }
 
+// IsServerError returns true if this ProtocolError should write a server error to the client.
 func (p *ProtocolError) IsServerErr() bool { return p.serverErr }
 
+// NewStdProtocolError returns a new ProtocolError intended to be treated as a standard error.
 func NewStdProtocolError() *ProtocolError { return &ProtocolError{true, false, false, ""} }
 
+// NewClientProtocolError returns a new ProtocolError intended to be treated as a client error.
 func NewClientProtocolError(msg string) *ProtocolError { return &ProtocolError{false, true, false, msg} }
 
+// NewServerProtocolError returns a new ProtocolError intended to be treated as a server error.
 func NewServerProtocolError(msg string) *ProtocolError { return &ProtocolError{false, false, true, msg} }
 
-///
-
+// A StorageCommand represents a client's unpacked storage command.
 type StorageCommand struct {
 	// header fields
 	Typ       int
@@ -82,16 +97,21 @@ type StorageCommand struct {
 	DataBlock []byte
 }
 
+// A RetrievalCommand represents a client's unpacked retrieval command.
 type RetrievalCommand struct {
 	Typ  int
 	keys []string
 }
 
+// A DeleteCommand represents a client's unpacked delete command.
 type DeleteCommand struct {
 	Key     string
 	NoReply bool
 }
 
+// A Command represents a client's unpacked command. It should be treated
+// as the union of three commands: storage, retrieval, and delete. At most one
+// of these commands should be non-nil at any given time.
 type Command struct {
 	storageCommand   *StorageCommand
 	retrievalCommand *RetrievalCommand

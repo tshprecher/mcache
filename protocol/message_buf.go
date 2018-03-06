@@ -40,6 +40,7 @@ var (
 	_ MessageBuffer = &textProtocolMessageBuffer{}
 )
 
+// Message
 type MessageBuffer interface {
 	Read() (*Command, error)
 	Write(r Response) error

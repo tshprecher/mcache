@@ -12,14 +12,31 @@ type kvListNode struct {
 	prev, next *kvListNode
 }
 
+// EvictionPolicy defines the strategy by which a StorageEngine
+// should evict Values.
 type EvictionPolicy interface {
+	// Capacity returns the total capacity, in bytes, of the memory to manage.
 	Capacity() int
+
+	// Used returns the current memory used, in bytes. The size of keys is included.
 	Used() int
+
+	// Touch indicates that a key has been written or read
 	Touch(key string) bool
+
+	// Add returns the set of keys that should be removed from the
+	// in-memory store and a boolean indicating if there is room to
+	// store the input value.
 	Add(key string, v Value) (evict []string, hasSpace bool)
+
+	// Remove indicates that the key has been removed from the StorageEngine.
+	// It returns false if and only if the EvictionPolicy is not managing
+	// the key.
 	Remove(key string) bool
 }
 
+// A lruEvictionPolicy is an LRU implementation of an EvictionPolicy
+// using doubly linked lists.
 type lruEvictionPolicy struct {
 	cap      int
 	used     int

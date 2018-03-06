@@ -7,7 +7,10 @@ import (
 	"time"
 )
 
-// TODO: honor noreply
+// A TextSession manages the connection and protocol logic by
+// reading commands from a MessageBuffer, handling the business logic,
+// and writing responses back to the client.
+// TODO: honor noreply flag
 type TextSession struct {
 	conn          net.Conn
 	messageBuffer MessageBuffer
@@ -17,7 +20,11 @@ type TextSession struct {
 	lastActive    time.Time
 }
 
-func NewTextProtocolSession(conn net.Conn, engine store.StorageEngine, timeout int) *TextSession {
+// NewTextSession returns a new TextSession given the established
+// connection, an existing StorageEngine, and a timeout in seconds. If no
+// command is read within the given timeout period, the connection and session
+// are closed.
+func NewTextSession(conn net.Conn, engine store.StorageEngine, timeout int) *TextSession {
 	return &TextSession{
 		conn:          conn,
 		messageBuffer: NewTextProtocolMessageBuffer(conn, conn),
@@ -28,20 +35,27 @@ func NewTextProtocolSession(conn net.Conn, engine store.StorageEngine, timeout i
 	}
 }
 
+// RemoteAddr returns conn.RemoteAddr() of the underlying connection.
 func (t *TextSession) RemoteAddr() net.Addr {
 	return t.conn.RemoteAddr()
 }
 
+// Alive returns true if and only if the session is still servicing requests.
 func (t *TextSession) Alive() bool {
 	return t.alive
 }
 
+// Close closes the underlying connection and designates this session as dead.
 func (t *TextSession) Close() error {
 	err := t.conn.Close()
 	t.alive = false
 	return err
 }
 
+// Serve attempts to read a command, handle it, and write the response
+// or error back to the client. It returns nil if and only if no command can
+// be processed or a command has successfully been processed. It is intended
+// to be polled.
 func (t *TextSession) Serve() error {
 	if !t.alive {
 		return errors.New("cannot serve a dead session")
@@ -97,6 +111,7 @@ func (t *TextSession) Serve() error {
 	return err
 }
 
+// serveSet handles the protocol logic for the 'set' command
 func (t *TextSession) serveSet(cmd *StorageCommand) error {
 	ok := t.engine.Set(cmd.Key, store.Value{cmd.Flags, 0, cmd.DataBlock})
 	if ok {
@@ -107,6 +122,7 @@ func (t *TextSession) serveSet(cmd *StorageCommand) error {
 	}
 }
 
+// serveCas handles the protocol logic for the 'cas' command
 func (t *TextSession) serveCas(cmd *StorageCommand) error {
 	exists, notFound := t.engine.Cas(cmd.Key, store.Value{cmd.Flags, cmd.CasUnique, cmd.DataBlock})
 	if exists {
@@ -118,6 +134,7 @@ func (t *TextSession) serveCas(cmd *StorageCommand) error {
 	}
 }
 
+// serveGetAndGets handles the protocol logic for the 'get' and 'gets' commands.
 func (t *TextSession) serveGetAndGets(cmd *RetrievalCommand) error {
 	results := []struct {
 		k string
@@ -135,6 +152,7 @@ func (t *TextSession) serveGetAndGets(cmd *RetrievalCommand) error {
 	return t.messageBuffer.Write(TextGetOrGetsResponse{pairs: results, withCasUniq: cmd.Typ == GetsCommand})
 }
 
+// serveDelete handles the protocol logic for the 'cas' command
 func (t *TextSession) serveDelete(cmd *DeleteCommand) error {
 	ok := t.engine.Delete(cmd.Key)
 	if ok {
