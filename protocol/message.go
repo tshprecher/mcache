@@ -56,6 +56,7 @@ func IsDeleteCommand(typ int) bool {
 // A ProtocolError is an error that also encapsulates its type with respect
 // to the memcache protocol: standard, client, or server. The proper error
 // response is sent to the client based on its type.
+// TODO: rename to error response
 type ProtocolError struct {
 	stdErr, clientErr, serverErr bool
 	msg                          string
@@ -64,14 +65,16 @@ type ProtocolError struct {
 // Error returns the message string in the case of client or server errors, "" otherwise.
 func (p *ProtocolError) Error() string { return p.msg }
 
-// IsStandardError returns true if this ProtocolError should write a std error to the client.
-func (p *ProtocolError) IsStandardErr() bool { return p.stdErr }
-
-// IsClientError returns true if this ProtocolError should write a client error to the client.
-func (p *ProtocolError) IsClientErr() bool { return p.clientErr }
-
-// IsServerError returns true if this ProtocolError should write a server error to the client.
-func (p *ProtocolError) IsServerErr() bool { return p.serverErr }
+// Bytes returns the proper protocol error bytes to be written on the wire.
+func (p *ProtocolError) Bytes() []byte {
+	if p.stdErr {
+		return []byte("ERROR\r\n")
+	} else if p.clientErr {
+		return []byte(fmt.Sprintf("CLIENT_ERROR %s\r\n", p.msg))
+	} else {
+		return []byte(fmt.Sprintf("SERVER_ERROR %s\r\n", p.msg))
+	}
+}
 
 // NewStdProtocolError returns a new ProtocolError intended to be treated as a standard error.
 func NewStdProtocolError() *ProtocolError { return &ProtocolError{true, false, false, ""} }
@@ -150,25 +153,6 @@ func (_ TextDeletedResponse) Bytes() []byte { return []byte("DELETED\r\n") }
 type TextNotFoundResponse struct{}
 
 func (_ TextNotFoundResponse) Bytes() []byte { return []byte("NOT_FOUND\r\n") }
-
-// A TextErrorResponse builds the "ERROR" response
-type TextErrorResponse struct{}
-
-func (_ TextErrorResponse) Bytes() []byte { return []byte("ERROR\r\n") }
-
-// A TextClientErrorResponse builds the "CLIENT_ERROR" response
-type TextClientErrorResponse struct{ msg string }
-
-func (t TextClientErrorResponse) Bytes() []byte {
-	return []byte(fmt.Sprintf("CLIENT_ERROR %s\r\n", t.msg))
-}
-
-// A TextServerErrorResponse builds the "SERVER_ERROR" response
-type TextServerErrorResponse struct{ msg string }
-
-func (t TextServerErrorResponse) Bytes() []byte {
-	return []byte(fmt.Sprintf("SERVER_ERROR %s\r\n", t.msg))
-}
 
 // A TextGetOrGetsResponse builds responses for get and gets commands
 // given a slice of Values to return to the client. The withCasUniq flag

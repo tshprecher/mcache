@@ -10,7 +10,6 @@ import (
 // A TextSession manages the connection and protocol logic by
 // reading commands from a MessageBuffer, handling the business logic,
 // and writing responses back to the client.
-// TODO: honor noreply flag
 type TextSession struct {
 	conn          net.Conn
 	messageBuffer MessageBuffer
@@ -66,13 +65,7 @@ func (t *TextSession) Serve() error {
 	}
 	if err != nil {
 		if perr, ok := err.(*ProtocolError); ok {
-			if perr.IsStandardErr() {
-				t.messageBuffer.Write(TextErrorResponse{})
-			} else if perr.IsClientErr() {
-				t.messageBuffer.Write(TextClientErrorResponse{perr.Error()})
-			} else if perr.IsServerErr() {
-				t.messageBuffer.Write(TextServerErrorResponse{perr.Error()})
-			}
+			t.messageBuffer.Write(perr)
 		}
 		// write an error and close the connection
 		// TODO: distinguish between recoverable and non recoverable errors?
@@ -114,24 +107,25 @@ func (t *TextSession) Serve() error {
 // serveSet handles the protocol logic for the 'set' command
 func (t *TextSession) serveSet(cmd *StorageCommand) error {
 	ok := t.engine.Set(cmd.Key, store.Value{cmd.Flags, 0, cmd.DataBlock})
-	if ok {
+	if ok && !cmd.NoReply {
 		return t.messageBuffer.Write(TextStoredResponse{})
-	} else {
-		// TODO: this can't fail. if it does write a server error
+	} else if !ok && !cmd.NoReply {
 		return t.messageBuffer.Write(TextNotStoredResponse{})
 	}
+	return nil
 }
 
 // serveCas handles the protocol logic for the 'cas' command
 func (t *TextSession) serveCas(cmd *StorageCommand) error {
 	exists, notFound := t.engine.Cas(cmd.Key, store.Value{cmd.Flags, cmd.CasUnique, cmd.DataBlock})
-	if exists {
+	if exists && !cmd.NoReply {
 		return t.messageBuffer.Write(TextExistsResponse{})
-	} else if notFound {
+	} else if notFound && !cmd.NoReply {
 		return t.messageBuffer.Write(TextNotFoundResponse{})
-	} else {
+	} else if !exists && !notFound && !cmd.NoReply {
 		return t.messageBuffer.Write(TextStoredResponse{})
 	}
+	return nil
 }
 
 // serveGetAndGets handles the protocol logic for the 'get' and 'gets' commands.
@@ -155,9 +149,10 @@ func (t *TextSession) serveGetAndGets(cmd *RetrievalCommand) error {
 // serveDelete handles the protocol logic for the 'cas' command
 func (t *TextSession) serveDelete(cmd *DeleteCommand) error {
 	ok := t.engine.Delete(cmd.Key)
-	if ok {
+	if ok && !cmd.NoReply {
 		return t.messageBuffer.Write(TextDeletedResponse{})
-	} else {
+	} else if !ok && !cmd.NoReply {
 		return t.messageBuffer.Write(TextNotFoundResponse{})
 	}
+	return nil
 }

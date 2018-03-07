@@ -20,33 +20,32 @@ func itemValuesEqual(item1, item2 *memcache.Item) bool {
 
 }
 
-// TODO: test case where value is empty (no bytes)
-func TestIntegration(t *testing.T) {
+func TestIntegrationClient(t *testing.T) {
 	// spin up a server
 	se := store.NewSimpleStorageEngine(store.NewLruEvictionPolicy(1024))
-	server := &Server{11210, se, nil, 10, sync.Mutex{}}
+	server := &Server{11210, se, nil, 2, sync.Mutex{}}
 	go server.Start()
 	time.Sleep(500 * time.Millisecond)
 
-	testSetAndGet(t)
+	testCliSetAndGet(t)
 
 	*se = *store.NewSimpleStorageEngine(store.NewLruEvictionPolicy(1024))
-	testGets(t)
+	testCliGets(t)
 
 	*se = *store.NewSimpleStorageEngine(store.NewLruEvictionPolicy(1024))
-	testMultipleSessions(t)
+	testCliMultipleSessions(t)
 
 	*se = *store.NewSimpleStorageEngine(store.NewLruEvictionPolicy(1024))
-	testDelete(t)
+	testCliDelete(t)
 
 	*se = *store.NewSimpleStorageEngine(store.NewLruEvictionPolicy(1024))
-	testDelete(t)
+	testCliDelete(t)
 
 	*se = *store.NewSimpleStorageEngine(store.NewLruEvictionPolicy(1024))
-	testCas(t)
+	testCliCas(t)
 }
 
-func testSetAndGet(t *testing.T) {
+func testCliSetAndGet(t *testing.T) {
 	mc := memcache.New("localhost:11210")
 
 	item1 := &memcache.Item{Key: "foo", Flags: 3, Value: []byte("my value")}
@@ -72,7 +71,7 @@ func testSetAndGet(t *testing.T) {
 	}
 }
 
-func testGets(t *testing.T) {
+func testCliGets(t *testing.T) {
 	mc := memcache.New("localhost:11210")
 	fooItem := &memcache.Item{Key: "foo", Flags: 3, Value: []byte("my value")}
 	barItem := &memcache.Item{Key: "bar", Flags: 2, Value: []byte("my value 2")}
@@ -95,7 +94,7 @@ func testGets(t *testing.T) {
 	}
 }
 
-func testMultipleSessions(t *testing.T) {
+func testCliMultipleSessions(t *testing.T) {
 	mc1 := memcache.New("localhost:11210")
 	mc2 := memcache.New("localhost:11210")
 
@@ -115,7 +114,7 @@ func testMultipleSessions(t *testing.T) {
 	}
 }
 
-func testDelete(t *testing.T) {
+func testCliDelete(t *testing.T) {
 	mc := memcache.New("localhost:11210")
 	fooItem, _ := mc.Get("foo")
 	if fooItem != nil {
@@ -136,7 +135,7 @@ func testDelete(t *testing.T) {
 	}
 }
 
-func testCas(t *testing.T) {
+func testCliCas(t *testing.T) {
 	mc := memcache.New("localhost:11210")
 
 	err := mc.CompareAndSwap(&memcache.Item{Key: "foo", Flags: 0, Value: nil})
