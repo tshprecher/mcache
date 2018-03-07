@@ -17,7 +17,7 @@ var (
 
 func main() {
 	flag.Parse()
-	glog.Infof("running server with port=%d cap=%d timeout=%d max_val_size", *port, *cap, *timeout, *maxValSize)
+	glog.Infof("running server with port=%d cap=%d timeout=%ds max_val_size=%d", *port, *cap, *timeout, *maxValSize)
 	glog.Infof("initializing storage engine...")
 	server := &Server{
 		port:       uint16(*port),

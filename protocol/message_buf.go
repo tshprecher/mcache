@@ -42,7 +42,7 @@ var (
 	_ MessageBuffer = &textProtocolMessageBuffer{}
 )
 
-// Message
+// MessageBuffer defines a channel for reading and writing unpacked protocol messages.
 type MessageBuffer interface {
 	Read() (*Command, error)
 	Write(r Response) error
