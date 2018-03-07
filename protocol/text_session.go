@@ -147,7 +147,7 @@ func (t *TextSession) serveGetAndGets(cmd *RetrievalCommand) error {
 	return t.messageBuffer.Write(TextGetOrGetsResponse{pairs: results, withCasUniq: cmd.Typ == GetsCommand})
 }
 
-// serveDelete handles the protocol logic for the 'cas' command
+// serveDelete handles the protocol logic for the 'delete' command
 func (t *TextSession) serveDelete(cmd *DeleteCommand) error {
 	ok := t.engine.Delete(cmd.Key)
 	if ok && !cmd.NoReply {
