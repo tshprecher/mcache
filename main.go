@@ -10,7 +10,7 @@ import (
 var (
 	// flags
 	port       = flag.Int("port", 11211, "server port")
-	cap        = flag.Int("cap", 1024*1024*1024, "total capacity in bytes")
+	cap        = flag.Int("cap", 1024*1024*1024, "total capacity in bytes (including keys)")
 	timeout    = flag.Int("timeout", 5, "maximum time in seconds an idle connection is open")
 	maxValSize = flag.Int("max_val_size", 0, "max size of a value in bytes, <= 0 for no limit")
 )
