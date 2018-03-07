@@ -11,7 +11,13 @@ import (
 
 func TestIntegrationProtocol(t *testing.T) {
 	se := store.NewSimpleStorageEngine(store.NewLruEvictionPolicy(1024))
-	server := &Server{11209, se, nil, 2, sync.Mutex{}}
+	server := &Server{
+		port:       11209,
+		se:         se,
+		lis:        nil,
+		maxValSize: 1024,
+		timeout:    2,
+		mu:         sync.Mutex{}}
 	go server.Start()
 	time.Sleep(500 * time.Millisecond)
 
@@ -66,6 +72,7 @@ func testProtoGetAndSet(t *testing.T) {
 	conn, _ := net.DialTCP("tcp", nil, tcpAddr)
 	defer conn.Close()
 
+	// properly formed messages
 	testMessages(t, conn,
 		[]string{
 			"get key\r\n",
@@ -103,6 +110,15 @@ func testProtoGetAndSet(t *testing.T) {
 			"END\r\n",
 		},
 	)
+
+	// invalid messages
+	testMessages(t, conn,
+		[]string{
+			"set key 3 0 2\r\n123\r\n",
+		},
+		[]string{
+			"CLIENT_ERROR data block exceeds size of value\r\n",
+		})
 }
 
 func testProtoDelete(t *testing.T) {

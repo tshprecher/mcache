@@ -17,10 +17,12 @@ var (
 	invalidKey            = NewClientErrorResponse("malformed key")
 	invalidFlags          = NewClientErrorResponse("malformed flags")
 	invalidExpTime        = NewClientErrorResponse("malformed exptime")
-	invalidBytes          = NewClientErrorResponse("malformed bytes")
+	invalidBytes          = NewClientErrorResponse("malformed num_bytes")
 	invalidCasUniq        = NewClientErrorResponse("malformed cas_unique")
 	noReplyExpected       = NewClientErrorResponse("expected 'noreply' as last term")
-	commandLineTooLong    = NewClientErrorResponse(fmt.Sprintf("command line exceeding %d bytes", MaxCommandLength))
+
+	commandLineTooLong = NewClientErrorResponse(fmt.Sprintf("command line exceeding %d bytes", MaxCommandLength))
+	dataBlockTooLong   = NewClientErrorResponse("data block exceeds size of value")
 
 	commandNotFound = NewStdErrorResponse()
 
@@ -49,16 +51,18 @@ type MessageBuffer interface {
 type textProtocolMessageBuffer struct {
 	wireIn      io.Reader
 	wireOut     io.Writer
+	maxValSize  int
 	curCmd      Command
 	cmdHeader   *bytes.Buffer
 	cmdType     int
 	cmdComplete bool
 }
 
-func NewTextProtocolMessageBuffer(wireIn io.Reader, wireOut io.Writer) *textProtocolMessageBuffer {
+func NewTextProtocolMessageBuffer(wireIn io.Reader, wireOut io.Writer, maxValSize int) *textProtocolMessageBuffer {
 	return &textProtocolMessageBuffer{
-		wireIn:  wireIn,
-		wireOut: wireOut,
+		wireIn:     wireIn,
+		wireOut:    wireOut,
+		maxValSize: maxValSize,
 		curCmd: Command{
 			storageCommand:   nil,
 			retrievalCommand: nil,
@@ -93,7 +97,10 @@ func (t *textProtocolMessageBuffer) Read() (cmd *Command, err error) {
 
 	// continue reading the body of the request
 	if t.cmdType != -1 {
-		t.readBody()
+		err = t.readBody()
+		if err != nil {
+			return
+		}
 	}
 
 	if t.cmdComplete {
@@ -117,7 +124,6 @@ func (t *textProtocolMessageBuffer) readHeader() error {
 		return err
 	}
 	for n > 0 {
-		//glog.Infof("DEBUG A: read header byte %v\n", b[0])
 		if t.cmdHeader.Len() > MaxCommandLength {
 			return commandLineTooLong
 		}
@@ -223,6 +229,10 @@ func (t *textProtocolMessageBuffer) unpackStorageCommand(typ int, terms []string
 	if err != nil {
 		return invalidBytes
 	}
+	if t.maxValSize > 0 && numBytes > uint64(t.maxValSize) {
+		return NewClientErrorResponse(fmt.Sprintf("num_bytes exceeded max of %d", t.maxValSize))
+	}
+
 	var casUnique int64
 	if typ == CasCommand {
 		casUnique, err = strconv.ParseInt(terms[5], 10, 64)
@@ -258,7 +268,6 @@ func (t *textProtocolMessageBuffer) unpackStorageCommand(typ int, terms []string
 func (t *textProtocolMessageBuffer) readDataBlock() error {
 	b := [1]byte{}
 	for len(t.curCmd.storageCommand.DataBlock) < int(t.curCmd.storageCommand.NumBytes)+2 {
-		//glog.Infof("DEBUG B: read body byte %v\n", b[0])
 		n, _ := t.wireIn.Read(b[0:1])
 		if n > 0 {
 			t.curCmd.storageCommand.DataBlock = append(t.curCmd.storageCommand.DataBlock, b[0:1]...)
@@ -266,8 +275,12 @@ func (t *textProtocolMessageBuffer) readDataBlock() error {
 			break
 		}
 	}
+
 	lenDataBlock := len(t.curCmd.storageCommand.DataBlock)
 	if lenDataBlock == int(t.curCmd.storageCommand.NumBytes)+2 {
+		if string(t.curCmd.storageCommand.DataBlock[lenDataBlock-2:]) != "\r\n" {
+			return dataBlockTooLong
+		}
 		t.curCmd.storageCommand.DataBlock = t.curCmd.storageCommand.DataBlock[0 : lenDataBlock-2]
 		t.cmdComplete = true
 	}

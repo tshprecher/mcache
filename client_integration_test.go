@@ -23,7 +23,13 @@ func itemValuesEqual(item1, item2 *memcache.Item) bool {
 func TestIntegrationClient(t *testing.T) {
 	// spin up a server
 	se := store.NewSimpleStorageEngine(store.NewLruEvictionPolicy(1024))
-	server := &Server{11210, se, nil, 2, sync.Mutex{}}
+	server := &Server{
+		port:       11210,
+		se:         se,
+		lis:        nil,
+		maxValSize: 1024,
+		timeout:    2,
+		mu:         sync.Mutex{}}
 	go server.Start()
 	time.Sleep(500 * time.Millisecond)
 

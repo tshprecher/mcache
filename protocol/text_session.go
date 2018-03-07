@@ -15,6 +15,7 @@ type TextSession struct {
 	messageBuffer MessageBuffer
 	engine        store.StorageEngine
 	alive         bool
+	maxValSize    int
 	timeout       int
 	lastActive    time.Time
 }
@@ -23,10 +24,10 @@ type TextSession struct {
 // connection, an existing StorageEngine, and a timeout in seconds. If no
 // command is read within the given timeout period, the connection and session
 // are closed.
-func NewTextSession(conn net.Conn, engine store.StorageEngine, timeout int) *TextSession {
+func NewTextSession(conn net.Conn, engine store.StorageEngine, maxValSize, timeout int) *TextSession {
 	return &TextSession{
 		conn:          conn,
-		messageBuffer: NewTextProtocolMessageBuffer(conn, conn),
+		messageBuffer: NewTextProtocolMessageBuffer(conn, conn, maxValSize),
 		engine:        engine,
 		alive:         true,
 		timeout:       timeout,

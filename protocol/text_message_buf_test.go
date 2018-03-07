@@ -106,7 +106,7 @@ func TestTextReadSplitPackets(t *testing.T) {
 		},
 	}
 	wireIn, wireOut := &bytes.Buffer{}, &bytes.Buffer{}
-	buf := NewTextProtocolMessageBuffer(wireIn, wireOut)
+	buf := NewTextProtocolMessageBuffer(wireIn, wireOut, 1024)
 	testTextRead(t, buf, wireIn, packets, expResults)
 }
 
@@ -126,7 +126,7 @@ func TestTextReadRetrievalCommand(t *testing.T) {
 		},
 	}
 	wireIn, wireOut := &bytes.Buffer{}, &bytes.Buffer{}
-	buf := NewTextProtocolMessageBuffer(wireIn, wireOut)
+	buf := NewTextProtocolMessageBuffer(wireIn, wireOut, 1024)
 	testTextRead(t, buf, wireIn, packets, expResults)
 }
 
@@ -151,7 +151,7 @@ func TestTextReadStorageCommand(t *testing.T) {
 		},
 	}
 	wireIn, wireOut := &bytes.Buffer{}, &bytes.Buffer{}
-	buf := NewTextProtocolMessageBuffer(wireIn, wireOut)
+	buf := NewTextProtocolMessageBuffer(wireIn, wireOut, 1024)
 	testTextRead(t, buf, wireIn, packets, expResults)
 }
 
@@ -193,7 +193,7 @@ func TestTextReadMultiple(t *testing.T) {
 		},
 	}
 	wireIn, wireOut := &bytes.Buffer{}, &bytes.Buffer{}
-	buf := NewTextProtocolMessageBuffer(wireIn, wireOut)
+	buf := NewTextProtocolMessageBuffer(wireIn, wireOut, 1024)
 	testTextRead(t, buf, wireIn, packets, expResults)
 }
 
@@ -213,13 +213,13 @@ func TestTextReadDeleteCommand(t *testing.T) {
 		},
 	}
 	wireIn, wireOut := &bytes.Buffer{}, &bytes.Buffer{}
-	buf := NewTextProtocolMessageBuffer(wireIn, wireOut)
+	buf := NewTextProtocolMessageBuffer(wireIn, wireOut, 1024)
 	testTextRead(t, buf, wireIn, packets, expResults)
 }
 
 func TestTextWrite(t *testing.T) {
 	wireIn, wireOut := &bytes.Buffer{}, &bytes.Buffer{}
-	buf := NewTextProtocolMessageBuffer(wireIn, wireOut)
+	buf := NewTextProtocolMessageBuffer(wireIn, wireOut, 1024)
 
 	resp := TextStoredResponse{}
 	buf.Write(resp)

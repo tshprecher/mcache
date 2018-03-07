@@ -30,11 +30,12 @@ func handleSession(session *protocol.TextSession) {
 }
 
 type Server struct {
-	port    uint16
-	se      store.StorageEngine
-	lis     net.Listener
-	timeout int
-	mu      sync.Mutex
+	port       uint16
+	se         store.StorageEngine
+	lis        net.Listener
+	maxValSize int
+	timeout    int
+	mu         sync.Mutex
 }
 
 func (s *Server) setListener(l net.Listener) {
@@ -60,7 +61,7 @@ func (s *Server) Start() error {
 			s.lis = nil
 			break
 		}
-		go handleSession(protocol.NewTextSession(conn, s.se, s.timeout))
+		go handleSession(protocol.NewTextSession(conn, s.se, s.maxValSize, s.timeout))
 	}
 	return nil
 }
