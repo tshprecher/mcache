@@ -12,17 +12,17 @@ import (
 
 var (
 	// protocol errors
-	invalidStorageCommand = NewClientProtocolError("storage commands must take exactly 5 or 6 terms")
-	invalidDeleteCommand  = NewClientProtocolError("delete must take exactly 2 or 3 terms")
-	invalidKey            = NewClientProtocolError("malformed key")
-	invalidFlags          = NewClientProtocolError("malformed flags")
-	invalidExpTime        = NewClientProtocolError("malformed exptime")
-	invalidBytes          = NewClientProtocolError("malformed bytes")
-	invalidCasUniq        = NewClientProtocolError("malformed cas_unique")
-	noReplyExpected       = NewClientProtocolError("expected 'noreply' as last term")
-	commandLineTooLong    = NewClientProtocolError(fmt.Sprintf("command line exceeding %d bytes", MaxCommandLength))
+	invalidStorageCommand = NewClientErrorResponse("storage commands must take exactly 5 or 6 terms")
+	invalidDeleteCommand  = NewClientErrorResponse("delete must take exactly 2 or 3 terms")
+	invalidKey            = NewClientErrorResponse("malformed key")
+	invalidFlags          = NewClientErrorResponse("malformed flags")
+	invalidExpTime        = NewClientErrorResponse("malformed exptime")
+	invalidBytes          = NewClientErrorResponse("malformed bytes")
+	invalidCasUniq        = NewClientErrorResponse("malformed cas_unique")
+	noReplyExpected       = NewClientErrorResponse("expected 'noreply' as last term")
+	commandLineTooLong    = NewClientErrorResponse(fmt.Sprintf("command line exceeding %d bytes", MaxCommandLength))
 
-	commandNotFound = NewStdProtocolError()
+	commandNotFound = NewStdErrorResponse()
 
 	// map the input string to command type
 	cmdStringToType = map[string]int{

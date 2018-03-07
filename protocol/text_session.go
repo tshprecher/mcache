@@ -64,7 +64,7 @@ func (t *TextSession) Serve() error {
 		return errors.New("session timed out")
 	}
 	if err != nil {
-		if perr, ok := err.(*ProtocolError); ok {
+		if perr, ok := err.(*ErrorResponse); ok {
 			t.messageBuffer.Write(perr)
 		}
 		// write an error and close the connection

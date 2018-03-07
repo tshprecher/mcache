@@ -12,7 +12,7 @@ import (
 
 const (
 	MaxKeyLength     = 250
-	MaxCommandLength = 300
+	MaxCommandLength = 1024
 
 	// the six storage commands
 	SetCommand = iota
@@ -53,20 +53,19 @@ func IsDeleteCommand(typ int) bool {
 	return typ == DelCommand
 }
 
-// A ProtocolError is an error that also encapsulates its type with respect
+// A ErrorResponse is an error that also encapsulates its type with respect
 // to the memcache protocol: standard, client, or server. The proper error
 // response is sent to the client based on its type.
-// TODO: rename to error response
-type ProtocolError struct {
+type ErrorResponse struct {
 	stdErr, clientErr, serverErr bool
 	msg                          string
 }
 
 // Error returns the message string in the case of client or server errors, "" otherwise.
-func (p *ProtocolError) Error() string { return p.msg }
+func (p *ErrorResponse) Error() string { return p.msg }
 
 // Bytes returns the proper protocol error bytes to be written on the wire.
-func (p *ProtocolError) Bytes() []byte {
+func (p *ErrorResponse) Bytes() []byte {
 	if p.stdErr {
 		return []byte("ERROR\r\n")
 	} else if p.clientErr {
@@ -76,14 +75,14 @@ func (p *ProtocolError) Bytes() []byte {
 	}
 }
 
-// NewStdProtocolError returns a new ProtocolError intended to be treated as a standard error.
-func NewStdProtocolError() *ProtocolError { return &ProtocolError{true, false, false, ""} }
+// NewStdErrorResponse returns a new ErrorResponse intended to be treated as a standard error.
+func NewStdErrorResponse() *ErrorResponse { return &ErrorResponse{true, false, false, ""} }
 
-// NewClientProtocolError returns a new ProtocolError intended to be treated as a client error.
-func NewClientProtocolError(msg string) *ProtocolError { return &ProtocolError{false, true, false, msg} }
+// NewClientErrorResponse returns a new ErrorResponse intended to be treated as a client error.
+func NewClientErrorResponse(msg string) *ErrorResponse { return &ErrorResponse{false, true, false, msg} }
 
-// NewServerProtocolError returns a new ProtocolError intended to be treated as a server error.
-func NewServerProtocolError(msg string) *ProtocolError { return &ProtocolError{false, false, true, msg} }
+// NewServerErrorResponse returns a new ErrorResponse intended to be treated as a server error.
+func NewServerErrorResponse(msg string) *ErrorResponse { return &ErrorResponse{false, false, true, msg} }
 
 // A StorageCommand represents a client's unpacked storage command.
 type StorageCommand struct {
