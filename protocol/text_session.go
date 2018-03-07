@@ -67,9 +67,6 @@ func (t *TextSession) Serve() error {
 		if perr, ok := err.(*ErrorResponse); ok {
 			t.messageBuffer.Write(perr)
 		}
-		// write an error and close the connection
-		// TODO: distinguish between recoverable and non recoverable errors?
-		// TODO: add logging where appropriate
 		return err
 	}
 
@@ -80,13 +77,13 @@ func (t *TextSession) Serve() error {
 			case SetCommand:
 				err = t.serveSet(cmd.storageCommand)
 			case AddCommand:
-				err = errors.New("add not yet implemented")
+				err = NewServerErrorResponse("add not yet implemented")
 			case ReplaceCommand:
-				err = errors.New("replace not yet implemented")
+				err = NewServerErrorResponse("replace not yet implemented")
 			case AppendCommand:
-				err = errors.New("append not yet implemented")
+				err = NewServerErrorResponse("append not yet implemented")
 			case PrependCommand:
-				err = errors.New("prepend not yet implemented")
+				err = NewServerErrorResponse("prepend not yet implemented")
 			case CasCommand:
 				err = t.serveCas(cmd.storageCommand)
 			}
@@ -101,6 +98,10 @@ func (t *TextSession) Serve() error {
 			panic("no command set")
 		}
 	}
+	if perr, ok := err.(*ErrorResponse); ok {
+		t.messageBuffer.Write(perr)
+	}
+
 	return err
 }
 
